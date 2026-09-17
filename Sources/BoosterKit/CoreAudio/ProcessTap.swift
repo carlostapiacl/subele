@@ -1,26 +1,26 @@
 import CoreAudio
 import Foundation
 
-/// A CoreAudio process tap: the public API, available since macOS 14.2, that
-/// captures what other processes are sending to an output device.
+/// Un process tap de CoreAudio: la API pública, disponible desde macOS 14.2, que
+/// captura lo que otros procesos están mandando a un dispositivo de salida.
 ///
-/// This is what makes the whole project possible without a driver. The older way
-/// — what Boom 3D and eqMac do — is to install an `AudioServerPlugIn` into
-/// `/Library/Audio/Plug-Ins/HAL`, take over the system's default output, and pass
-/// audio through. A tap needs none of that.
+/// Es lo que hace posible todo el proyecto sin instalar driver. La forma vieja
+/// —la que usan Boom 3D y eqMac— es instalar un `AudioServerPlugIn` en
+/// `/Library/Audio/Plug-Ins/HAL`, ponerse como salida por defecto del sistema y
+/// pasar el audio a través. Un tap no necesita nada de eso.
 ///
-/// Two settings matter:
+/// Dos ajustes importan:
 ///
-/// - `.mutedWhenTapped` silences the original path for every tapped process, so
-///   the audio is heard once — through us — rather than twice.
-/// - Excluding our own process keeps us out of our own tap. Without it, what we
-///   write to the device would be captured and fed back in.
+/// - `.mutedWhenTapped` silencia el camino original de cada proceso tapeado, así
+///   el audio se escucha una vez —a través nuestro— y no dos.
+/// - Excluir nuestro propio proceso nos deja fuera de nuestro propio tap. Sin eso,
+///   lo que escribimos al dispositivo se capturaría y volvería a entrar.
 public final class ProcessTap {
 
     public let objectID: AudioObjectID
     public let uuid: UUID
 
-    /// Taps everything going to `deviceUID` except the given processes.
+    /// Tapea todo lo que va a `deviceUID` menos los procesos indicados.
     public init(excluding processes: [AudioObjectID], deviceUID: String, stream: Int = 0) throws {
         let description = CATapDescription(
             __excludingProcesses: processes.map { NSNumber(value: $0) },
@@ -32,9 +32,9 @@ public final class ProcessTap {
 
         var objectID = AudioObjectID(kAudioObjectUnknown)
         try check(AudioHardwareCreateProcessTap(description, &objectID),
-                  "create the process tap")
+                  "crear el process tap")
         guard objectID != kAudioObjectUnknown else {
-            throw AudioError("the process tap was created empty")
+            throw AudioError("el process tap se creó vacío")
         }
         self.objectID = objectID
         self.uuid = description.uuid

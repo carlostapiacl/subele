@@ -1,27 +1,15 @@
 import BoosterKit
 import Foundation
 
-/// One binary, two faces. Without arguments it is the menu bar app, which is
-/// what the .app bundle launches; `--cli` is the same engine driven from stdin,
-/// which is useful for testing without packaging anything.
+/// Un binario, dos caras. Sin argumentos es la app de barra de menú, que es lo que
+/// lanza el bundle .app; `--cli` es el mismo motor manejado desde stdin, útil para
+/// probar sin empaquetar nada.
 
 let arguments = Array(CommandLine.arguments.dropFirst())
 
 if arguments.contains("-h") || arguments.contains("--help") {
-    print("""
-
-      Audio Booster \(Booster.version)
-      Raise macOS volume past 100% without installing a driver.
-
-        (no arguments)   menu bar app
-        --cli            interactive console
-        --buffer <n>     frames per callback (lower = less latency)
-        --version
-        --help
-
-      BOOSTER_TRACE=1 traces every startup step to stderr.
-
-    """)
+    print(Strings.current.helpText
+        .replacingOccurrences(of: "{version}", with: Booster.version))
     exit(0)
 }
 
@@ -30,7 +18,7 @@ if arguments.contains("--version") {
     exit(0)
 }
 
-/// Frames per callback, for measuring what the buffer size costs in latency.
+/// Frames por callback, para medir cuánta latencia cuesta el tamaño de buffer.
 let bufferFrames: UInt32? = {
     guard let index = arguments.firstIndex(of: "--buffer"),
           index + 1 < arguments.count,

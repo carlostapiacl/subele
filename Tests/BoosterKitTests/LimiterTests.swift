@@ -2,10 +2,10 @@ import Foundation
 import Testing
 @testable import BoosterKit
 
-@Suite("Limiter")
+@Suite("Limitador")
 struct LimiterTests {
 
-    @Test("quiet material passes through untouched")
+    @Test("el material tranquilo pasa sin que lo toquen")
     func transparentBelowCeiling() {
         let processor = makeProcessor(gain: 1, mode: .transparent)
         let output = render(processor, sine(decibels: -20, frames: 48_000, channels: 2),
@@ -13,7 +13,7 @@ struct LimiterTests {
         #expect(abs(linearToDecibels(steadyStatePeak(output, channels: 2)) - -20) < 0.2)
     }
 
-    @Test("the ceiling is reached, not exceeded", arguments: [
+    @Test("llega al techo pero no lo pasa", arguments: [
         (gain: Float(3), input: Float(-3)),
         (gain: Float(4), input: Float(0)),
         (gain: Float(4), input: Float(-6)),
@@ -26,10 +26,10 @@ struct LimiterTests {
         #expect(abs(measured - ceilingDecibels) < 0.1)
     }
 
-    @Test("a transient from silence to full scale does not overshoot")
+    @Test("un transitorio de silencio a fondo de escala no desborda")
     func transientDoesNotOvershoot() {
-        // The case lookahead exists for. A limiter that only smooths attack and
-        // release lets the first peak through before the gain has come down.
+        // El caso para el que existe el lookahead. Un limitador que solo suaviza
+        // ataque y release deja pasar el primer pico antes de haber bajado.
         let channels = 2
         let frames = 24_000
         var input = [Float](repeating: 0, count: frames * channels)
@@ -42,7 +42,7 @@ struct LimiterTests {
         #expect(linearToDecibels(peak(output)) <= ceilingDecibels + 0.05)
     }
 
-    @Test("output never reaches full scale, so the safety clamp never engages")
+    @Test("la salida nunca llega a fondo de escala, así que el clamp no actúa")
     func neverClips() {
         let processor = makeProcessor(gain: 4, mode: .loudness)
         let output = render(processor, sine(decibels: 0, frames: 48_000, channels: 2),

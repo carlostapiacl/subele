@@ -3,4 +3,6 @@
 *.o
 *.dSYM/
 Audio Booster.app/
+Tools/AppIcon.iconset/
+Tools/AppIcon.icns
 .DS_Store

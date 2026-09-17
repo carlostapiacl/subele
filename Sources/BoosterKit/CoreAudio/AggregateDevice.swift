@@ -1,12 +1,14 @@
 import CoreAudio
 import Foundation
 
-/// A private aggregate device that pairs a process tap with a real output device.
+/// Un dispositivo agregado privado que junta un process tap con un dispositivo de
+/// salida real.
 ///
-/// The tap is the input and the hardware is the output, so a single IOProc gives
-/// both ends in one callback: read what the system is playing, process it, write
-/// it back out. The device is private, so it never shows up in Sound preferences
-/// and the user's chosen output is left alone.
+/// El tap es la entrada y el hardware es la salida, así que un solo IOProc da las
+/// dos puntas en el mismo callback: leer lo que el sistema está reproduciendo,
+/// procesarlo, escribirlo de vuelta. El dispositivo es privado, así que nunca
+/// aparece en las preferencias de Sonido y la salida elegida por el usuario queda
+/// intacta.
 public final class AggregateDevice {
 
     public let objectID: AudioDeviceID
@@ -30,12 +32,13 @@ public final class AggregateDevice {
 
         var objectID = AudioDeviceID(kAudioObjectUnknown)
         try check(AudioHardwareCreateAggregateDevice(description as CFDictionary, &objectID),
-                  "create the aggregate device")
+                  "crear el dispositivo agregado")
         self.objectID = objectID
     }
 
-    /// The number of frames the device hands over per callback. Lowering it cuts
-    /// latency and raises the wake-up rate; the device clamps to what it supports.
+    /// Cuántos frames entrega el dispositivo por callback. Bajarlo recorta la
+    /// latencia y sube la frecuencia de despertadas; el dispositivo ajusta al
+    /// valor más cercano que soporte.
     public var bufferFrameSize: UInt32 {
         get {
             AudioObject.optionalValue(objectID, kAudioDevicePropertyBufferFrameSize,
@@ -43,7 +46,7 @@ public final class AggregateDevice {
         }
         set {
             try? AudioObject.setValue(objectID, kAudioDevicePropertyBufferFrameSize,
-                                      to: newValue, describing: "set the buffer frame size")
+                                      to: newValue, describing: "fijar el tamaño de buffer")
         }
     }
 

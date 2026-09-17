@@ -2,123 +2,134 @@
 
 [![test](https://github.com/carlostapiacl/subele/actions/workflows/test.yml/badge.svg)](https://github.com/carlostapiacl/subele/actions/workflows/test.yml)
 [![license](https://img.shields.io/badge/license-MIT-222)](LICENSE)
-[![macOS](https://img.shields.io/badge/macOS-14.2%2B-222)](#requirements)
-[![no dependencies](https://img.shields.io/badge/dependencies-0-222)](Package.swift)
+[![macOS](https://img.shields.io/badge/macOS-14.2%2B-222)](#requisitos)
+[![sin dependencias](https://img.shields.io/badge/dependencias-0-222)](Package.swift)
 
-**Turn macOS past 100% without installing a driver, and without it sounding like a
-blown speaker.**
+**Español** · [English](README.en.md)
 
-A menu bar app. Move the slider, the system gets louder. What is unusual is
-underneath: no kernel extension, no audio driver, and your default output device
-is never taken over.
+**Sube macOS más allá del 100% sin instalar drivers, y sin que suene a parlante
+reventado.**
+
+Una app de barra de menú. Movés el slider, el sistema suena más fuerte. Lo raro
+está abajo: ninguna extensión de kernel, ningún driver de audio, y tu dispositivo
+de salida por defecto nunca queda secuestrado.
 
 ---
 
-## Why this exists
+## Por qué existe
 
-Every volume booster on macOS has worked the same way for a decade. Boom 3D,
-eqMac and the rest install an `AudioServerPlugIn` into
-`/Library/Audio/Plug-Ins/HAL`, make themselves the system's default output
-device, and pass audio through to the real hardware. That means a driver to sign,
-an installer, `sudo`, your output device quietly hijacked, and something that
-breaks every time Apple ships an OS update.
+Todos los amplificadores de volumen de macOS funcionan igual desde hace una
+década. Boom 3D, eqMac y el resto instalan un `AudioServerPlugIn` en
+`/Library/Audio/Plug-Ins/HAL`, se ponen como salida por defecto del sistema y
+pasan el audio hacia el hardware real. Eso implica un driver que firmar, un
+instalador, `sudo`, tu salida secuestrada sin avisar, y algo que se rompe cada vez
+que Apple saca una actualización.
 
-**macOS 14.2 made all of that unnecessary.** `AudioHardwareCreateProcessTap` is a
-public API that captures what other processes are playing — no driver involved.
-This project is built on it.
+**macOS 14.2 volvió todo eso innecesario.** `AudioHardwareCreateProcessTap` es una
+API pública que captura lo que otros procesos están reproduciendo, sin driver de
+por medio. Este proyecto está construido sobre eso.
 
-|  | driver-based boosters | audio-booster |
+|  | boosters con driver | audio-booster |
 | --- | --- | --- |
-| Installs a driver | yes, with `sudo` | no |
-| Takes over default output | yes | **no** |
-| Turning it up | raw gain, then clipping | lookahead limiter, no clipping |
-| Per-app control | no | possible (the tap takes a process list) |
-| Uninstall | driver removal | delete the app |
+| Instala driver | sí, con `sudo` | no |
+| Toma la salida por defecto | sí | **no** |
+| Al subir el volumen | ganancia cruda, después clipping | limitador con lookahead, sin clipping |
+| Control por aplicación | no | posible (el tap acepta lista de procesos) |
+| Desinstalar | sacar el driver | borrar la app |
 
-The second row is the one people feel. Multiplying a signal by three means
-everything above a third of full scale gets its tops shorn off, and sheared
-waveforms are that thin, tinny "boosted" sound. A limiter that sees the peak
-before it arrives does not have to shear anything.
+La segunda fila es la que se siente. Multiplicar una señal por tres significa que
+todo lo que pasaba de un tercio de escala queda con las puntas cortadas, y una
+onda cortada es ese sonido fino y a lata del "volumen aumentado". Un limitador que
+ve el pico antes de que llegue no tiene que cortar nada.
 
-## How it works
+## Cómo funciona
 
 ```
-system processes ──┐
-                   ├──→ [ process tap ] ──→ IOProc ──→ gain
-                   │      muted when                     ↓
-                   │       tapped              compressor + makeup   (loudness mode)
-                   │                                     ↓
-                   │                      brickwall limiter, 3 ms lookahead
-                   │                                     ↓
-this process ──────┴──── excluded from the tap ────→ output device
+procesos del sistema ──┐
+                       ├──→ [ process tap ] ──→ IOProc ──→ ganancia
+                       │      silenciado                       ↓
+                       │      al tapearse        compresor + makeup   (modo loudness)
+                       │                                       ↓
+                       │                    limitador brickwall, 3 ms de lookahead
+                       │                                       ↓
+este proceso ──────────┴──── excluido del tap ────→ dispositivo de salida
 ```
 
-1. A **process tap** captures everything heading for the default output device,
-   with our own process excluded — otherwise what we write would be captured and
-   fed straight back in. `muteBehavior = .mutedWhenTapped` silences the original
-   path, so the audio is heard once, through us.
-2. A **private aggregate device** pairs the tap (input) with the real hardware
-   (output), so one IOProc callback holds both ends.
-3. The callback processes and writes back.
+1. Un **process tap** captura todo lo que va al dispositivo de salida por defecto,
+   con nuestro propio proceso excluido — si no, lo que escribimos se capturaría y
+   volvería a entrar. `muteBehavior = .mutedWhenTapped` silencia el camino
+   original, así el audio se escucha una vez, a través nuestro.
+2. Un **dispositivo agregado privado** junta el tap (entrada) con el hardware real
+   (salida), así un solo callback del IOProc tiene las dos puntas.
+3. El callback procesa y escribe de vuelta.
 
-The system's default output device never changes. The volume menu still says
-"MacBook Pro Speakers", because it still *is* the MacBook Pro speakers.
+La salida por defecto del sistema nunca cambia. El menú de volumen sigue diciendo
+"MacBook Pro (bocinas)", porque siguen siendo las bocinas del MacBook Pro.
 
-## The limiter
+## El limitador
 
-This is the part worth reading the source for.
+Esta es la parte por la que vale la pena leer el código.
 
-1. The signal is delayed by 3 ms.
-2. For every incoming frame, the gain that frame would need in order to stay
-   under the ceiling is computed.
-3. A **monotonic queue** keeps the running minimum of those gains across the
-   whole lookahead window, amortised O(1) per sample.
-4. The frame leaving the delay line is multiplied by the lowest gain any frame
-   between it and the present will require.
+1. La señal se retrasa 3 ms.
+2. Para cada frame que entra se calcula la ganancia que ese frame necesitaría para
+   no pasar el techo.
+3. Una **cola monótona** mantiene el mínimo corrido de esas ganancias sobre toda
+   la ventana de lookahead, en O(1) amortizado por muestra.
+4. El frame que sale de la línea de retardo se multiplica por la ganancia más baja
+   que vaya a exigir cualquier frame entre él y el presente.
 
-Step 3 is the one that is easy to get wrong, and this project got it wrong first.
-Smoothing the gain with an attack and a release instead of taking the window
-minimum lets the release creep the gain back up during those 3 ms. The limiter
-then overshoots by about 0.3 dB — enough to hit full scale and clip, quietly, on
-exactly the loud transients you were trying to protect. With the window minimum,
-overshoot is impossible by construction rather than by tuning constants until it
-looks fine.
+El paso 3 es el que es fácil de errar, y este proyecto lo erró primero. Suavizar
+la ganancia con ataque y release en vez de tomar el mínimo de la ventana deja que
+el release vaya subiendo la ganancia durante esos 3 ms. El limitador entonces
+desborda unos 0,3 dB — suficiente para llegar a fondo de escala y clipear, en
+silencio, justo en los transitorios fuertes que uno quería proteger. Con el mínimo
+de la ventana, desbordar es imposible por construcción y no por haber ajustado
+constantes hasta que se viera bien.
 
-There is a test for it: a signal that jumps from silence to full scale at 400%
-gain lands on the ceiling, not through it.
+Hay un test para eso: una señal que salta de silencio a fondo de escala con 400%
+de ganancia aterriza en el techo, no lo atraviesa.
 
-## Modes
+## Modos
 
-- **Transparent** — gain and limiting only. Dynamics untouched; what was loud
-  relative to what was quiet still is. For music.
-- **Loudness** — adds compression with automatic makeup gain, lifting quiet parts
-  instead of flattening loud ones. For speech, calls, and video with weak audio.
+- **Transparente** — solo ganancia y limitación. Dinámica intacta: lo que sonaba
+  fuerte respecto de lo que sonaba bajo sigue igual. Para música.
+- **Loudness** — agrega compresión con makeup automático, que sube lo bajo en vez
+  de aplastar lo alto. Para voz, llamadas y video con audio flojo.
 
-Makeup gain is not a refinement, it is the whole point of putting a compressor
-there. A compressor without makeup makes audio *quieter*. The first version of
-this DSP shipped that mistake and measured quieter at 300% gain than at 100%.
-There is a test pinning that down too.
+El makeup no es un detalle, es la razón misma de poner un compresor ahí. Un
+compresor sin makeup hace el audio *más bajo*. La primera versión de este DSP
+salió con ese error y medía más bajo a 300% de ganancia que a 100%. También hay un
+test que lo deja clavado.
 
-## Latency
+## Latencia
 
-The chain costs about **two buffer periods plus the 3 ms lookahead**. That ratio
-held across every buffer size measured, so buffer size is the one lever that
-actually moves it. Measured on the IOProc's own timestamps, not estimated:
+La cadena cuesta unos **dos períodos de buffer más los 3 ms de lookahead**. Esa
+proporción se mantuvo en todos los tamaños de buffer medidos, así que el tamaño de
+buffer es la única palanca que la mueve de verdad. Medido sobre los timestamps del
+propio IOProc, no estimado:
 
-| buffer | added latency |
+| buffer | latencia agregada |
 | --- | --- |
-| 128 frames | 8.8 ms |
-| **256 frames (default)** | **14.6 ms** |
-| 512 frames (what CoreAudio picks) | 26.2 ms |
+| 128 frames | 8,8 ms |
+| **256 frames (default)** | **14,6 ms** |
+| 512 frames (lo que elige CoreAudio) | 26,2 ms |
 
-Music will not care at any of these. Video might: 26 ms is around where lip sync
-starts being noticeable, which is why the default is 256 rather than whatever
-CoreAudio hands you. The setting lives under **Latency** in the menu.
+A la música no le va a importar en ninguno de los tres. Al video puede que sí:
+26 ms es más o menos donde el desfase de labios empieza a notarse, y por eso el
+default es 256 y no lo que CoreAudio entrega solo. El ajuste está en **Latencia**,
+dentro del menú.
 
-## Install
+## Idioma
 
-Requires macOS 14.2 or later and the Swift toolchain (Xcode Command Line Tools
-are enough — this project is built without Xcode).
+La interfaz viene en español e inglés, con selector en el menú (**Idioma**). Por
+defecto sigue al idioma del sistema. La consola usa el mismo ajuste.
+
+## Requisitos
+
+macOS 14.2 o posterior y la cadena de herramientas de Swift. Las Command Line
+Tools de Xcode alcanzan: este proyecto se compila sin Xcode.
+
+## Instalación
 
 ```bash
 git clone https://github.com/carlostapiacl/subele
@@ -127,31 +138,34 @@ cd audio-booster
 open "Audio Booster.app"
 ```
 
-`build-app.sh` builds release, runs the tests, assembles the `.app` by hand
-(SwiftPM does not produce bundles) and signs it ad-hoc. Ad-hoc signing is enough
-to run it on the machine that built it; distributing it would need a Developer ID
-certificate and notarisation.
+`build-app.sh` compila release, corre los tests, genera el ícono, arma el `.app` a
+mano (SwiftPM no produce bundles) y lo firma ad-hoc. La firma ad-hoc alcanza para
+correrlo en la máquina que lo compiló; distribuirlo pediría un certificado
+Developer ID y notarización.
 
-## Usage
+El ícono se genera por código en `Tools/make-icon.swift`, así que se revisa en
+diff como cualquier otro archivo en vez de ser un binario opaco.
 
-A speaker icon appears in the menu bar. Opening it gives you the output device
-and format, a level meter that turns orange while the limiter is working, a
-50–400% slider, the mode switch, and a latency setting.
+## Uso
 
-Gain and mode persist between launches.
+Aparece un ícono de parlante en la barra de menú. Al abrirlo: el dispositivo de
+salida y su formato, un medidor de nivel que se pone naranja mientras el limitador
+trabaja, un slider de 50 a 400%, el selector de modo, la latencia y el idioma.
 
-One binary, two faces — the `.app` bundle just wraps it:
+La ganancia, el modo, la latencia y el idioma se guardan entre sesiones.
+
+Un binario, dos caras — el bundle `.app` solo lo envuelve:
 
 ```bash
-booster              # menu bar app
-booster --cli        # interactive console
+booster              # app de barra de menú
+booster --cli        # consola interactiva
 booster --cli --buffer 128
 booster --help
 ```
 
-`BOOSTER_TRACE=1` traces every startup step to stderr. CoreAudio calls can block
-indefinitely without returning an error, and when stdout is buffered such a hang
-leaves no trace at all.
+`BOOSTER_TRACE=1` traza cada paso del arranque a stderr. Las llamadas a CoreAudio
+pueden bloquearse indefinidamente sin devolver error, y con stdout bufferizado un
+cuelgue así no deja ningún rastro.
 
 ## Tests
 
@@ -159,61 +173,63 @@ leaves no trace at all.
 swift test
 ```
 
-The DSP tests are pure signal processing — no audio device, no tap, no
-permissions — so they run on CI exactly as they do on a laptop. That is
-deliberate: measuring through the speakers is useless, because anything else
-playing on the machine mixes into the tap and contaminates the meter. Two rounds
-of measurements were lost to background music before the tests moved off the
-hardware.
+Los tests del DSP son procesamiento de señal puro — sin dispositivo de audio, sin
+tap, sin permisos — así que corren en CI igual que en un laptop. Eso es
+deliberado: medir por los parlantes no sirve, porque cualquier otra cosa que suene
+en la máquina se mezcla en el tap y contamina el medidor. Se perdieron dos rondas
+de mediciones por música de fondo antes de que los tests se fueran del hardware.
 
-What they pin down: exact gain while there is headroom, the limiter reaching the
-ceiling but never passing it, transients from silence to full scale, bit-identical
-output across block sizes from 32 to 1024, every channel count from mono to 7.1,
-and NaN or infinity arriving in the input without killing the chain.
+Lo que dejan clavado: ganancia exacta mientras haya headroom, el limitador
+llegando al techo pero nunca pasándolo, transitorios de silencio a fondo de
+escala, salida idéntica bit a bit entre bloques de 32 y de 1024, todos los conteos
+de canales de mono a 7.1, y NaN o infinito llegando a la entrada sin matar la
+cadena.
 
-## Known limitations
+## Limitaciones conocidas
 
-- **Another driver-based booster will deadlock it.** If eqMac or Boom 3D is
-  running it owns the default output device, so we tap *its* virtual device,
-  which is itself passing audio through. `AudioDeviceCreateIOProcIDWithBlock`
-  then blocks forever with no error. Quit it first.
-- **Parameters are written without synchronisation.** `gain` and `mode` are
-  written by the UI thread and read by the audio thread. On x86-64 and arm64 an
-  aligned 4-byte load or store is atomic in hardware, so nothing goes wrong in
-  practice, but it is formally a data race. Fixing it properly needs atomics.
-- **Loudness mode raises the noise floor**, since makeup applies when there is no
-  signal too. Inherent to the mode, not a defect.
-- **No app icon yet** — it uses the macOS generic one.
-- **It does not start at login.** Deliberate: no login item is installed without
-  being asked for.
+- **Otro booster con driver lo cuelga.** Si eqMac o Boom 3D está corriendo, es
+  dueño de la salida por defecto, así que tapeamos *su* dispositivo virtual, que a
+  su vez está pasando audio. `AudioDeviceCreateIOProcIDWithBlock` entonces bloquea
+  para siempre sin dar error. Hay que cerrarlo primero.
+- **Los parámetros se escriben sin sincronizar.** `gain` y `mode` los escribe el
+  hilo de la interfaz y los lee el hilo de audio. En x86-64 y arm64 una carga o
+  guarda alineada de 4 bytes es atómica en hardware, así que en la práctica no
+  pasa nada, pero formalmente es una carrera de datos. Arreglarlo bien pide
+  atómicos.
+- **El modo loudness sube el piso de ruido**, porque el makeup también se aplica
+  cuando no hay señal. Es inherente al modo, no un defecto.
+- **No arranca al iniciar sesión.** A propósito: no se instala un elemento de
+  arranque sin que lo pidan.
 
-## Layout
+## Estructura
 
 ```
-Sources/BoosterKit/          the reusable part, no AppKit
+Sources/BoosterKit/          la parte reutilizable, sin AppKit
   CoreAudio/
-    AudioObject.swift        typed wrapper over the property API, errors, tracing
-    AudioDevices.swift       device queries and default-output observation
-    ProcessTap.swift         tap lifetime
-    AggregateDevice.swift    aggregate device lifetime, buffer size
+    AudioObject.swift        envoltorio tipado de la API de propiedades, errores, traza
+    AudioDevices.swift       consultas de dispositivos y observación de la salida
+    ProcessTap.swift         vida del tap
+    AggregateDevice.swift    vida del dispositivo agregado, tamaño de buffer
   DSP/
-    Decibels.swift           dB conversions and smoothing coefficients
-    Compressor.swift         soft-knee curve and automatic makeup
-    Limiter.swift            delay line and sliding-window minimum
-    BoostProcessor.swift     the chain
+    Decibels.swift           conversiones a dB y coeficientes de suavizado
+    Compressor.swift         curva de rodilla suave y makeup automático
+    Limiter.swift            línea de retardo y mínimo deslizante
+    BoostProcessor.swift     la cadena
   Engine/
-    BoostEngine.swift        tap + aggregate + IOProc + latency measurement
-Sources/booster/             the executable
-  main.swift                 picks a mode from the arguments
-  MenuBarApp.swift           AppKit front end
+    BoostEngine.swift        tap + agregado + IOProc + medición de latencia
+Sources/booster/             el ejecutable
+  main.swift                 elige el modo según los argumentos
+  MenuBarApp.swift           frente en AppKit
   LevelMeterView.swift
   ConsoleMode.swift
+  Strings.swift              todo el texto visible, tipado, en dos idiomas
+Tools/make-icon.swift        genera AppIcon.icns
 Tests/BoosterKitTests/
 ```
 
-`BoosterKit` has no AppKit dependency and no knowledge of the UI, so the engine
-can be embedded in something else.
+`BoosterKit` no depende de AppKit ni sabe que existe una interfaz, así que el
+motor se puede embeber en otra cosa.
 
-## License
+## Licencia
 
 MIT © Carlos Tapia

@@ -1,9 +1,9 @@
 import Foundation
 @testable import BoosterKit
 
-/// Interleaved sine at a known level. Everything here is deterministic on
-/// purpose: measuring through the speakers is useless, because anything else
-/// playing on the machine mixes into the tap and contaminates the meter.
+/// Seno intercalado a un nivel conocido. Todo acá es determinístico a propósito:
+/// medir por los parlantes no sirve, porque cualquier otra cosa que suene en la
+/// máquina se mezcla en el tap y contamina el medidor.
 func sine(decibels: Float, frames: Int, channels: Int,
           sampleRate: Float = 48_000, frequency: Float = 440) -> [Float] {
     let amplitude = decibelsToLinear(decibels)
@@ -15,7 +15,7 @@ func sine(decibels: Float, frames: Int, channels: Int,
     return buffer
 }
 
-/// Runs a buffer through a processor in blocks, returning the processed audio.
+/// Pasa un buffer por el procesador en bloques y devuelve el audio procesado.
 func render(_ processor: BoostProcessor, _ input: [Float],
             channels: Int, blockSize: Int = 512) -> [Float] {
     var buffer = input
@@ -32,7 +32,7 @@ func render(_ processor: BoostProcessor, _ input: [Float],
     return buffer
 }
 
-/// Peak of the second half, once the lookahead and the attack have settled.
+/// Pico de la segunda mitad, ya asentados el lookahead y el ataque.
 func steadyStatePeak(_ samples: [Float], channels: Int) -> Float {
     let start = (samples.count / channels / 2) * channels
     return samples[start...].reduce(0) { max($0, abs($1)) }
@@ -51,5 +51,5 @@ func makeProcessor(gain: Float, mode: BoostMode,
     return processor
 }
 
-/// The limiter ceiling, as a level the output must never exceed.
+/// El techo del limitador, como nivel que la salida nunca debe pasar.
 let ceilingDecibels: Float = -0.3

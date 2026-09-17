@@ -1,28 +1,28 @@
 import CoreAudio
 import Foundation
 
-/// Queries about output devices: which one the system is using, what it is
-/// called, and what format it runs at.
+/// Consultas sobre dispositivos de salida: cuál está usando el sistema, cómo se
+/// llama y a qué formato corre.
 public enum AudioDevices {
 
     public static func defaultOutput() throws -> AudioDeviceID {
         let device = try AudioObject.value(
             AudioObject.system, kAudioHardwarePropertyDefaultOutputDevice,
-            initial: AudioDeviceID(0), describing: "read the default output device")
+            initial: AudioDeviceID(0), describing: "leer el dispositivo de salida por defecto")
         guard device != kAudioObjectUnknown else {
-            throw AudioError("there is no default output device")
+            throw AudioError("no hay dispositivo de salida por defecto")
         }
         return device
     }
 
     public static func uid(of device: AudioObjectID) throws -> String {
         try AudioObject.string(device, kAudioDevicePropertyDeviceUID,
-                               describing: "read the device UID")
+                               describing: "leer el UID del dispositivo")
     }
 
     public static func name(of device: AudioObjectID) throws -> String {
         try AudioObject.string(device, kAudioObjectPropertyName,
-                               describing: "read the device name")
+                               describing: "leer el nombre del dispositivo")
     }
 
     public static func streamFormat(
@@ -30,10 +30,10 @@ public enum AudioDevices {
     ) throws -> AudioStreamBasicDescription {
         try AudioObject.value(device, kAudioDevicePropertyStreamFormat, scope: scope,
                               initial: AudioStreamBasicDescription(),
-                              describing: "read the stream format")
+                              describing: "leer el formato del stream")
     }
 
-    /// Translates a process ID into the CoreAudio process object that taps take.
+    /// Traduce un ID de proceso al objeto de proceso de CoreAudio que piden los taps.
     public static func processObject(for pid: pid_t) throws -> AudioObjectID {
         var address = AudioObject.address(kAudioHardwarePropertyTranslatePIDToProcessObject)
         var pid = pid
@@ -42,12 +42,12 @@ public enum AudioDevices {
         try check(AudioObjectGetPropertyData(
             AudioObject.system, &address,
             UInt32(MemoryLayout<pid_t>.size), &pid, &size, &object),
-                  "translate PID \(pid) into a process object")
+                  "traducir el PID \(pid) a objeto de proceso")
         return object
     }
 
-    /// Calls `handler` on the main queue whenever the system's default output
-    /// device changes. Returns a token that removes the listener when released.
+    /// Llama a `handler` en la cola principal cada vez que cambia el dispositivo de
+    /// salida por defecto. Devuelve un token que quita el listener al soltarse.
     public static func observeDefaultOutput(_ handler: @escaping () -> Void) -> Any? {
         var address = AudioObject.address(kAudioHardwarePropertyDefaultOutputDevice)
         let block: AudioObjectPropertyListenerBlock = { _, _ in handler() }

@@ -1,25 +1,28 @@
 import Foundation
 
-/// A brickwall limiter with lookahead. This is the piece that justifies the
-/// project: it is what lets the gain go up without the sound falling apart.
+/// Limitador brickwall con lookahead. Es la pieza que justifica el proyecto: lo
+/// que permite subir la ganancia sin que el sonido se desarme.
 ///
-/// A booster that only multiplies clips — it shears the tops off the waveform,
-/// and that is the tinny sound people associate with "volume boosters". The fix
-/// is to see the peak before it arrives and to be already turned down when it
-/// does. Concretely:
+/// Un booster que solo multiplica clipea — le corta las puntas a la onda, y ese es
+/// el sonido a lata que la gente asocia con los "amplificadores de volumen". La
+/// solución es ver el pico antes de que llegue y estar ya bajado cuando llega.
+/// En concreto:
 ///
-/// 1. The signal is delayed by `lookaheadSeconds`.
-/// 2. For every incoming frame, the gain that frame would need is computed.
-/// 3. A **monotonic queue** keeps the running minimum of those gains over the
-///    whole lookahead window, in amortised O(1) per sample.
-/// 4. The frame leaving the delay line is multiplied by the lowest gain that any
-///    frame between it and the present will require.
+/// 1. La señal se retrasa `lookaheadSeconds`.
+/// 2. Para cada frame que entra se calcula la ganancia que ese frame necesitaría
+///    para no pasar el techo.
+/// 3. Una **cola monótona** mantiene el mínimo corrido de esas ganancias sobre
+///    toda la ventana de lookahead, en O(1) amortizado por muestra.
+/// 4. El frame que sale de la línea de retardo se multiplica por la ganancia más
+///    baja que va a exigir cualquier frame entre él y el presente.
 ///
-/// Step 3 is the part that is easy to get wrong. Smoothing the gain with attack
-/// and release instead of taking the window minimum lets the release creep the
-/// gain back up during the lookahead, and the limiter overshoots by a few tenths
-/// of a dB — enough to hit full scale and clip. With the window minimum,
-/// overshoot is impossible by construction rather than by tuning.
+/// El paso 3 es el fácil de errar, y este proyecto lo erró primero. Suavizar la
+/// ganancia con ataque y release en vez de tomar el mínimo de la ventana deja que
+/// el release vaya subiendo la ganancia durante esos 3 ms. El limitador entonces
+/// desborda unos 0,3 dB — suficiente para llegar a fondo de escala y clipear, en
+/// silencio, justo en los transitorios fuertes que uno quería proteger. Con el
+/// mínimo de la ventana, desbordar es imposible por construcción y no por haber
+/// ajustado constantes hasta que se viera bien.
 public final class Limiter {
 
     public static let maximumChannels = 8
@@ -36,17 +39,18 @@ public final class Limiter {
     private var gain: Float = 1
     private var channels = 2
 
-    /// Circular delay line, interleaved with a fixed stride of `maximumChannels`
-    /// so that a change in channel count cannot move existing frames.
+    /// Línea de retardo circular, intercalada con paso fijo de `maximumChannels`
+    /// para que un cambio en el conteo de canales no pueda mover los frames que ya
+    /// están adentro.
     private let delayLine: UnsafeMutablePointer<Float>
     private let delayCapacityFrames = Limiter.maximumLookaheadFrames
     private var lookaheadFrames = 0
     private var writeIndex = 0
 
-    /// Monotonic queue holding the sliding-window minimum of the target gains.
-    /// Capacity covers the window (lookahead + 1), the transient extra element
-    /// pushed before the front is dropped, and the slot a circular buffer must
-    /// leave free to tell full from empty.
+    /// Cola monótona con el mínimo deslizante de las ganancias objetivo. La
+    /// capacidad cubre la ventana (lookahead + 1), el elemento extra que se empuja
+    /// antes de descartar el frente, y el lugar que un buffer circular tiene que
+    /// dejar libre para distinguir lleno de vacío.
     private let queueIndex: UnsafeMutablePointer<Int>
     private let queueValue: UnsafeMutablePointer<Float>
     private let queueCapacity = Limiter.maximumLookaheadFrames + 8
@@ -54,9 +58,9 @@ public final class Limiter {
     private var queueTail = 0
     private var sampleCounter = 0
 
-    /// Lowest gain applied during the last processed block, in dB (<= 0).
+    /// Ganancia más baja aplicada durante el último bloque procesado, en dB (≤ 0).
     public private(set) var reductionDecibels: Float = 0
-    /// Peak of the last processed block, linear.
+    /// Pico del último bloque procesado, lineal.
     public private(set) var outputPeak: Float = 0
 
     public init() {
@@ -100,12 +104,13 @@ public final class Limiter {
         outputPeak = 0
     }
 
-    /// Processes interleaved audio in place. Allocation-free and lock-free: safe
-    /// to call from a CoreAudio IOProc.
+    /// Procesa audio intercalado en sitio. Sin asignar memoria y sin locks: se
+    /// puede llamar desde un IOProc de CoreAudio.
     public func process(_ buffer: UnsafeMutablePointer<Float>, frames: Int, channels: Int) {
-        // Never call prepare() from here — it memsets the delay line, which does
-        // not belong in a real-time callback. A changed channel count is simply
-        // adopted; the delay line flushes itself within one lookahead window.
+        // Nunca llamar a prepare() desde acá: hace memset de la línea de retardo y
+        // eso no va en un callback de tiempo real. Un cambio en el conteo de
+        // canales simplemente se adopta; la línea se limpia sola dentro de una
+        // ventana de lookahead.
         let channels = min(max(channels, 1), Limiter.maximumChannels)
         self.channels = channels
 
@@ -121,7 +126,7 @@ public final class Limiter {
                 framePeak = max(framePeak, abs(buffer[base + channel]))
             }
 
-            // Delay line: store the incoming frame, locate the outgoing one.
+            // Línea de retardo: guardar el frame que entra, ubicar el que sale.
             let writeBase = writeIndex * stride
             let readIndex = (writeIndex + delayCapacityFrames - lookaheadFrames)
                 % delayCapacityFrames
@@ -131,7 +136,7 @@ public final class Limiter {
             }
             writeIndex = (writeIndex + 1) % delayCapacityFrames
 
-            // Sliding-window minimum of the target gain.
+            // Mínimo deslizante de la ganancia objetivo.
             let target: Float = framePeak > ceiling ? ceiling / framePeak : 1
             while queueTail != queueHead {
                 let back = (queueTail + queueCapacity - 1) % queueCapacity
@@ -146,8 +151,8 @@ public final class Limiter {
             let windowMinimum = queueValue[queueHead]
             sampleCounter += 1
 
-            // Turning down is immediate — the lookahead already moved it early.
-            // Coming back up is smoothed so the gain does not zipper.
+            // Bajar es inmediato — el lookahead ya lo adelantó. Volver a subir se
+            // suaviza para que la ganancia no haga zipper.
             if windowMinimum < gain {
                 gain = windowMinimum
             } else {

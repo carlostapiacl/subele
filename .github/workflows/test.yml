@@ -14,8 +14,8 @@ jobs:
         run: swift --version
       - name: Build
         run: swift build
-      # The DSP tests are pure signal processing — no audio device, no tap, no
-      # permissions — so they run on a headless CI machine exactly as they do
-      # on a laptop.
+      # Los tests del DSP son procesamiento de señal puro — sin dispositivo de
+      # audio, sin tap, sin permisos — así que corren en una máquina de CI sin
+      # cabeza igual que en un laptop.
       - name: Test
         run: swift test

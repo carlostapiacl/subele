@@ -1,25 +1,24 @@
 import Foundation
 
 public enum BoostMode: String, CaseIterable, Sendable {
-    /// Gain and limiting only. Dynamics are left alone: what was loud relative to
-    /// what was quiet still is. The right choice for music.
+    /// Solo ganancia y limitación. La dinámica queda intacta: lo que sonaba fuerte
+    /// respecto de lo que sonaba bajo sigue igual. Lo correcto para música.
     case transparent
-    /// Adds compression with makeup, which lifts the quiet parts rather than
-    /// flattening the loud ones. The right choice for speech, calls, and video
-    /// with weak audio.
+    /// Agrega compresión con makeup, que sube lo bajo en vez de aplastar lo alto.
+    /// Lo correcto para voz, llamadas y video con audio flojo.
     case loudness
 }
 
-/// The full chain: gain → [compressor + makeup] → brickwall limiter.
+/// La cadena completa: ganancia → [compresor + makeup] → limitador brickwall.
 ///
-/// Two passes over the block rather than one interleaved loop. The stages are
-/// sequential, so the result is identical, and keeping them apart means the
-/// compressor and the limiter can be read, tested and replaced on their own.
+/// Dos pasadas sobre el bloque en vez de un solo bucle entrelazado. Las etapas son
+/// secuenciales, así que el resultado es idéntico, y tenerlas separadas permite
+/// leer, testear y reemplazar el compresor y el limitador por su cuenta.
 ///
-/// Allocation-free and lock-free: safe to call from a CoreAudio IOProc.
+/// Sin asignar memoria y sin locks: se puede llamar desde un IOProc de CoreAudio.
 public final class BoostProcessor {
 
-    /// Input gain, linear. 1.0 leaves the signal alone, 4.0 is 400%.
+    /// Ganancia de entrada, lineal. 1.0 deja la señal intacta, 4.0 es 400%.
     public var gain: Float = 1
     public var mode: BoostMode = .transparent
 
@@ -60,18 +59,19 @@ public final class BoostProcessor {
             var framePeak: Float = 0
             for channel in 0..<channels {
                 let raw = buffer[base + channel] * gain
-                // A single NaN would poison the compressor envelope permanently:
-                // NaN propagates through every comparison, so the envelope never
-                // recovers and the output dies. One isFinite per sample costs
-                // nothing measurable and keeps the processor bounded by design.
+                // Un solo NaN envenenaría el envolvente del compresor para
+                // siempre: NaN se propaga por toda comparación, así que el
+                // envolvente nunca se recupera y la salida se muere. Un isFinite
+                // por muestra no cuesta nada medible y deja el procesador acotado
+                // por diseño.
                 let sample = raw.isFinite ? raw : 0
                 buffer[base + channel] = sample
                 framePeak = max(framePeak, abs(sample))
             }
 
             if applyCompression {
-                // Stereo-linked: one gain for every channel, so the image does
-                // not wander when one side is louder than the other.
+                // Link estéreo: una sola ganancia para todos los canales, así la
+                // imagen no se mueve cuando un lado suena más fuerte que el otro.
                 let compressorGain = compressor.gain(forPeak: framePeak)
                 for channel in 0..<channels {
                     buffer[base + channel] *= compressorGain

@@ -1,13 +1,13 @@
 import CoreAudio
 import Foundation
 
-/// Captures system audio with a process tap, processes it, and returns it to the
-/// same output device.
+/// Captura el audio del sistema con un process tap, lo procesa y lo devuelve al
+/// mismo dispositivo de salida.
 ///
-/// No driver is installed and the system's default output device is **not**
-/// changed. The tap silences the original path for the processes it captures,
-/// and we write the processed audio back to the same hardware. Our own process is
-/// excluded from the tap, otherwise what we write would be captured and fed back.
+/// No instala ningún driver y **no** cambia la salida por defecto del sistema. El
+/// tap silencia el camino original de los procesos que captura, y nosotros
+/// escribimos el audio procesado al mismo hardware. Nuestro propio proceso queda
+/// excluido del tap; si no, lo que escribimos se capturaría y volvería a entrar.
 ///
 /// ```
 /// system processes ──┐
@@ -26,24 +26,24 @@ public final class BoostEngine {
 
     public let processor = BoostProcessor()
 
-    /// Called on the main queue when macOS changes the default output device. A
-    /// tap is bound to one device, so without rebuilding the chain we would keep
-    /// processing for hardware nobody is listening to any more.
+    /// Se llama en la cola principal cuando macOS cambia el dispositivo de salida
+    /// por defecto. Un tap está atado a un dispositivo, así que sin rehacer la
+    /// cadena seguiríamos procesando para hardware que ya nadie escucha.
     public var onDefaultOutputChanged: (() -> Void)?
 
-    /// Frames per callback to ask the aggregate device for. Lower means less
-    /// latency and more wake-ups; the device clamps to what it supports.
-    /// `nil` leaves whatever CoreAudio chose.
+    /// Frames por callback que se le piden al dispositivo agregado. Más bajo es
+    /// menos latencia y más despertadas; el dispositivo ajusta a lo que soporte.
+    /// `nil` deja lo que haya elegido CoreAudio.
     public var preferredBufferFrames: UInt32?
 
     public private(set) var isRunning = false
     public private(set) var info: Info?
 
-    /// Measured, not estimated: the gap between the timestamp of the audio coming
-    /// in and the timestamp at which it will be played, taken from the IOProc.
+    /// Medida, no estimada: la distancia entre el timestamp del audio que entra y
+    /// el timestamp en que se va a reproducir, tomada del IOProc.
     public private(set) var measuredIOLatencySeconds: Double = 0
 
-    /// Everything this chain adds on top of playing straight to the device.
+    /// Todo lo que esta cadena agrega por sobre reproducir derecho al dispositivo.
     public var addedLatencySeconds: Double {
         measuredIOLatencySeconds + Double(processor.limiter.lookaheadSeconds)
     }
@@ -53,9 +53,9 @@ public final class BoostEngine {
     private var ioProcID: AudioDeviceIOProcID?
     private var defaultOutputObserver: Any?
 
-    /// Interleaved working buffer for gathering input and scattering output.
-    /// Allocated once and kept for the life of the engine: freeing it while an
-    /// IOProc could still run would be a use-after-free.
+    /// Buffer intercalado de trabajo, para reunir la entrada y repartir la salida.
+    /// Se asigna una vez y vive tanto como el motor: liberarlo mientras un IOProc
+    /// todavía puede correr sería un use-after-free.
     private let maximumFrames = 8192
     private let scratch: UnsafeMutablePointer<Float>
 
@@ -77,18 +77,18 @@ public final class BoostEngine {
     }
 
     private func begin() throws {
-        trace("asking for the default output device")
+        trace("pidiendo el dispositivo de salida por defecto")
         let outputDevice = try AudioDevices.defaultOutput()
         let outputUID = try AudioDevices.uid(of: outputDevice)
         let deviceName = (try? AudioDevices.name(of: outputDevice)) ?? outputUID
-        trace("device: \(deviceName) uid=\(outputUID)")
+        trace("dispositivo: \(deviceName) uid=\(outputUID)")
 
         let ownProcess = try AudioDevices.processObject(for: getpid())
-        trace("own process object=\(ownProcess); creating the tap")
+        trace("proceso propio=\(ownProcess); creando el tap")
         let tap = try ProcessTap(excluding: [ownProcess], deviceUID: outputUID)
         self.tap = tap
 
-        trace("tap created id=\(tap.objectID); creating the aggregate device")
+        trace("tap creado id=\(tap.objectID); creando el dispositivo agregado")
         let aggregate = try AggregateDevice(tapUUID: tap.uuid, outputDeviceUID: outputUID)
         self.aggregate = aggregate
 
@@ -103,7 +103,7 @@ public final class BoostEngine {
 
         guard inputFormat.mFormatID == kAudioFormatLinearPCM,
               inputFormat.mFormatFlags & kAudioFormatFlagIsFloat != 0 else {
-            throw AudioError("the tap did not deliver linear float32 audio")
+            throw AudioError("el tap no entregó audio float32 lineal")
         }
 
         let info = Info(deviceName: deviceName,
@@ -112,21 +112,21 @@ public final class BoostEngine {
                         outputChannels: Int(outputFormat.mChannelsPerFrame),
                         bufferFrames: Int(aggregate.bufferFrameSize))
         self.info = info
-        trace("format \(info.sampleRate) Hz \(info.inputChannels)->\(info.outputChannels), "
-              + "\(info.bufferFrames) frames per callback; installing the IOProc")
+        trace("formato \(info.sampleRate) Hz \(info.inputChannels)->\(info.outputChannels), "
+              + "\(info.bufferFrames) frames por callback; instalando el IOProc")
 
         processor.prepare(sampleRate: info.sampleRate, channels: info.outputChannels)
 
         try installIOProc(on: aggregate)
 
         try check(AudioDeviceStart(aggregate.objectID, ioProcID),
-                  "start the aggregate device")
+                  "arrancar el dispositivo agregado")
 
         defaultOutputObserver = AudioDevices.observeDefaultOutput { [weak self] in
             self?.onDefaultOutputChanged?()
         }
         isRunning = true
-        trace("running")
+        trace("corriendo")
     }
 
     private func installIOProc(on aggregate: AggregateDevice) throws {
@@ -140,9 +140,9 @@ public final class BoostEngine {
 
             let output = UnsafeMutableAudioBufferListPointer(outputData)
 
-            // Output buffers are always filled. CoreAudio does not promise they
-            // arrive zeroed, so returning without writing replays whatever the
-            // previous cycle left behind — which is noise.
+            // Los buffers de salida se llenan siempre. CoreAudio no garantiza que
+            // lleguen en cero, así que volver sin escribir reproduce lo que haya
+            // dejado el ciclo anterior — que es ruido.
             for buffer in output {
                 if let data = buffer.mData { memset(data, 0, Int(buffer.mDataByteSize)) }
             }
@@ -151,9 +151,9 @@ public final class BoostEngine {
                 UnsafeMutablePointer(mutating: inputData))
             guard input.count > 0, output.count > 0 else { return }
 
-            // Channel counts are summed across buffers: a non-interleaved device
-            // presents one buffer per channel, not one buffer holding N channels.
-            // Reading only buffer[0] would leave the other channels silent.
+            // Los canales se suman sobre los buffers: un dispositivo NO
+            // intercalado presenta un buffer por canal, no un buffer con N
+            // canales. Mirar solo buffer[0] dejaría los demás en silencio.
             var inputChannels = 0
             var outputChannels = 0
             var frames = Int.max
@@ -176,7 +176,7 @@ public final class BoostEngine {
             self?.recordLatency(input: inputTime, output: outputTime)
 
             if input.count == 1, output.count == 1, inputChannels == outputChannels {
-                // The common case: one interleaved buffer at each end.
+                // El caso común: un solo buffer intercalado en cada punta.
                 let source = input[0].mData!.assumingMemoryBound(to: Float.self)
                 let destination = output[0].mData!.assumingMemoryBound(to: Float.self)
                 destination.update(from: source, count: frames * outputChannels)
@@ -184,7 +184,7 @@ public final class BoostEngine {
                 return
             }
 
-            // General case: gather into one interleaved buffer…
+            // Caso general: reunir todo en un solo buffer intercalado…
             var channel = 0
             for buffer in input {
                 let channels = Int(buffer.mNumberChannels)
@@ -208,7 +208,7 @@ public final class BoostEngine {
 
             processor.process(scratch, frames: frames, channels: outputChannels)
 
-            // …and scatter it back out.
+            // …y repartirlo de vuelta.
             channel = 0
             for buffer in output {
                 let channels = Int(buffer.mNumberChannels)
@@ -222,11 +222,11 @@ public final class BoostEngine {
                 }
                 channel += channels
             }
-        }, "install the IOProc")
+        }, "instalar el IOProc")
     }
 
-    /// The distance between "this audio was captured" and "this audio will be
-    /// heard", straight from the timestamps CoreAudio hands the callback.
+    /// La distancia entre "este audio se capturó" y "este audio se va a escuchar",
+    /// directo de los timestamps que CoreAudio le pasa al callback.
     private func recordLatency(input: UnsafePointer<AudioTimeStamp>,
                                output: UnsafePointer<AudioTimeStamp>) {
         let inputStamp = input.pointee
@@ -246,8 +246,8 @@ public final class BoostEngine {
             AudioDeviceDestroyIOProcID(aggregate.objectID, ioProcID)
         }
         ioProcID = nil
-        // Order matters: the aggregate references the tap, so it goes first.
-        // Both destroy themselves in deinit.
+        // El orden importa: el agregado referencia al tap, así que va primero.
+        // Los dos se destruyen solos en deinit.
         aggregate = nil
         tap = nil
         info = nil

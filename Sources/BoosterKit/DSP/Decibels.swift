@@ -8,7 +8,8 @@ import Foundation
     powf(10, decibels / 20)
 }
 
-/// Coefficient of a one-pole smoother that reaches ~63% of a step in `seconds`.
+/// Coeficiente de un suavizador de un polo que alcanza ~63% de un escalón en
+/// `seconds`.
 @inline(__always)
 public func smoothingCoefficient(seconds: Float, sampleRate: Float) -> Float {
     guard seconds > 0, sampleRate > 0 else { return 0 }

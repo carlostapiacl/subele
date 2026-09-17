@@ -1,7 +1,8 @@
 import AppKit
 
-/// Output level bar. It turns orange while the limiter is working, which is the
-/// honest signal that you are asking for more gain than the material can take.
+/// Barra de nivel de salida. Se pone naranja mientras el limitador está
+/// trabajando, que es la señal honesta de que estás pidiendo más ganancia de la
+/// que el material aguanta.
 final class LevelMeterView: NSView {
 
     var level: Float = 0 { didSet { if level != oldValue { needsDisplay = true } } }
@@ -20,7 +21,8 @@ final class LevelMeterView: NSView {
     }
 }
 
-/// Top-left origin, so the panel can be laid out downwards like it reads.
+/// Origen arriba a la izquierda, para poder maquetar el panel hacia abajo, como
+/// se lee.
 final class FlippedView: NSView {
     override var isFlipped: Bool { true }
 }

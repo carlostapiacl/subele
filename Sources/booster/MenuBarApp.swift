@@ -2,8 +2,8 @@ import AppKit
 import BoosterKit
 import Foundation
 
-/// The menu bar front end. Owns one engine, a status item, and a 20 Hz timer for
-/// the meter; everything else is the engine's business.
+/// El frente de barra de menú. Es dueño de un motor, de un ítem de estado y de un
+/// timer a 20 Hz para el medidor; todo lo demás es asunto del motor.
 final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private static var retained: MenuBarApp?
@@ -11,9 +11,9 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     static func run() -> Never {
         let application = NSApplication.shared
         let delegate = MenuBarApp()
-        retained = delegate                       // NSApplication holds it weakly
+        retained = delegate                       // NSApplication lo guarda débil
         application.delegate = delegate
-        application.setActivationPolicy(.accessory)   // menu bar only, no Dock icon
+        application.setActivationPolicy(.accessory)   // barra de menú, sin Dock
         application.run()
         exit(0)
     }
@@ -24,20 +24,14 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         static let bufferFrames = "bufferFrames"
     }
 
-    /// Buffer sizes offered in the menu, with the latency each one costs.
+    /// Tamaños de buffer que ofrece el menú.
     ///
-    /// The chain costs about two buffer periods plus the limiter's 3 ms lookahead,
-    /// and that ratio held across every size measured, so this is the one lever
-    /// that actually moves latency. 256 is the default: it halves the latency
-    /// CoreAudio would pick on its own while still leaving plenty of headroom.
-    /// 0 means "leave whatever CoreAudio picked".
-    private static let bufferChoices: [(title: String, frames: UInt32)] = [
-        ("Lowest — 128 frames", 128),
-        ("Low — 256 frames", 256),
-        ("Relaxed — 512 frames", 512),
-        ("Automatic", 0),
-    ]
-
+    /// La cadena cuesta unos dos períodos de buffer más los 3 ms de lookahead del
+    /// limitador, y esa proporción se mantuvo en todos los tamaños medidos, así
+    /// que esta es la única palanca que mueve la latencia de verdad. 256 es el
+    /// default: parte al medio la latencia que CoreAudio elegiría solo y todavía
+    /// deja margen de sobra. 0 significa "dejar lo que eligió CoreAudio".
+    private static let bufferChoices: [UInt32] = [128, 256, 512, 0]
     private static let defaultBufferFrames: UInt32 = 256
 
     private let engine = BoostEngine()
@@ -57,18 +51,23 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var enabledItem: NSMenuItem!
     private var retryItem: NSMenuItem!
     private var bufferItems: [NSMenuItem] = []
+    private var languageItems: [NSMenuItem] = []
 
-    // MARK: Lifecycle
+    private var strings: Strings { Strings.current }
+
+    // MARK: Ciclo de vida
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         restoreSettings()
-        buildStatusItem()
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.button?.imagePosition = .imageLeading
+        rebuildMenu()
 
         engine.onDefaultOutputChanged = { [weak self] in self?.scheduleRestart() }
         startEngine()
 
-        // .common so the meter keeps moving while the menu is open: an open menu
-        // runs its own run loop mode, which would otherwise freeze the timer.
+        // .common para que el medidor siga vivo con el menú abierto: un menú
+        // abierto corre su propio modo de run loop y si no congelaría el timer.
         let timer = Timer(timeInterval: 1.0 / 20.0, repeats: true) { [weak self] _ in
             self?.refreshMeter()
         }
@@ -81,7 +80,7 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         engine.stop()
     }
 
-    // MARK: Engine
+    // MARK: Motor
 
     private func startEngine() {
         do {
@@ -99,8 +98,8 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         startEngine()
     }
 
-    /// A device change fires several notifications in a row; wait for them to
-    /// settle rather than rebuilding the chain once per notification.
+    /// Un cambio de dispositivo dispara varias notificaciones seguidas; se espera a
+    /// que se aquieten en vez de rehacer la cadena una vez por notificación.
     private func scheduleRestart() {
         restartWork?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.restartEngine() }
@@ -108,11 +107,13 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
     }
 
-    // MARK: Building the menu
+    // MARK: Construcción del menú
 
-    private func buildStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.imagePosition = .imageLeading
+    /// Se vuelve a llamar entero al cambiar de idioma: los títulos de NSMenuItem no
+    /// se recalculan solos y rearmar es más simple que reescribir cada uno.
+    private func rebuildMenu() {
+        bufferItems.removeAll()
+        languageItems.removeAll()
 
         let menu = NSMenu()
         menu.delegate = self
@@ -123,29 +124,49 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(panel)
         menu.addItem(.separator())
 
-        enabledItem = item("Enabled", #selector(toggleEnabled))
+        enabledItem = item(strings.enabled, #selector(toggleEnabled))
         menu.addItem(enabledItem)
-        menu.addItem(item("Reset to 100%", #selector(resetGain), key: "0"))
+        menu.addItem(item(strings.resetGain, #selector(resetGain), key: "0"))
 
-        let bufferItem = NSMenuItem(title: "Latency", action: nil, keyEquivalent: "")
-        let bufferMenu = NSMenu()
-        for (index, choice) in Self.bufferChoices.enumerated() {
-            let entry = item(choice.title, #selector(bufferChosen(_:)))
+        let latencyItem = NSMenuItem(title: strings.latencyMenu, action: nil, keyEquivalent: "")
+        let latencyMenu = NSMenu()
+        for (index, frames) in Self.bufferChoices.enumerated() {
+            let entry = item(bufferTitle(frames), #selector(bufferChosen(_:)))
             entry.tag = index
-            bufferMenu.addItem(entry)
+            latencyMenu.addItem(entry)
             bufferItems.append(entry)
         }
-        bufferItem.submenu = bufferMenu
-        menu.addItem(bufferItem)
+        latencyItem.submenu = latencyMenu
+        menu.addItem(latencyItem)
 
-        retryItem = item("Retry", #selector(retry), key: "r")
+        let languageItem = NSMenuItem(title: strings.languageMenu, action: nil, keyEquivalent: "")
+        let languageMenu = NSMenu()
+        for (index, language) in AppLanguage.allCases.enumerated() {
+            let entry = item(language.label, #selector(languageChosen(_:)))
+            entry.tag = index
+            languageMenu.addItem(entry)
+            languageItems.append(entry)
+        }
+        languageItem.submenu = languageMenu
+        menu.addItem(languageItem)
+
+        retryItem = item(strings.retry, #selector(retry), key: "r")
         menu.addItem(retryItem)
 
         menu.addItem(.separator())
-        menu.addItem(item("Quit Audio Booster", #selector(quit), key: "q"))
+        menu.addItem(item(strings.quit, #selector(quit), key: "q"))
 
         statusItem.menu = menu
         refreshChrome()
+    }
+
+    private func bufferTitle(_ frames: UInt32) -> String {
+        switch frames {
+        case 128: return strings.bufferLowest
+        case 256: return strings.bufferLow
+        case 512: return strings.bufferRelaxed
+        default: return strings.bufferAutomatic
+        }
     }
 
     private func item(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
@@ -193,8 +214,8 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         view.addSubview(gainLabel)
 
         modeControl.segmentCount = 2
-        modeControl.setLabel("Transparent", forSegment: 0)
-        modeControl.setLabel("Loudness", forSegment: 1)
+        modeControl.setLabel(strings.transparent, forSegment: 0)
+        modeControl.setLabel(strings.loudness, forSegment: 1)
         modeControl.segmentStyle = .rounded
         modeControl.frame = NSRect(x: margin, y: 126, width: inner, height: 24)
         modeControl.target = self
@@ -205,9 +226,9 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return view
     }
 
-    // MARK: Refreshing
+    // MARK: Refresco
 
-    /// Everything that does not change twenty times a second.
+    /// Todo lo que no cambia veinte veces por segundo.
     private func refreshChrome() {
         let percent = Int((engine.processor.gain * 100).rounded())
         gainSlider.floatValue = engine.processor.gain * 100
@@ -218,24 +239,29 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let chosen = storedBufferFrames()
         for (index, item) in bufferItems.enumerated() {
-            item.state = Self.bufferChoices[index].frames == chosen ? .on : .off
+            item.state = Self.bufferChoices[index] == chosen ? .on : .off
+        }
+        let language = AppLanguage.stored
+        for (index, item) in languageItems.enumerated() {
+            item.state = AppLanguage.allCases[index] == language ? .on : .off
         }
 
         if let lastError {
-            titleLabel.stringValue = "Not running"
+            titleLabel.stringValue = strings.notRunning
             subtitleLabel.stringValue = lastError
             subtitleLabel.textColor = .systemOrange
         } else if !isEnabled {
-            titleLabel.stringValue = "Disabled"
-            subtitleLabel.stringValue = "Audio passes through untouched"
+            titleLabel.stringValue = strings.disabled
+            subtitleLabel.stringValue = strings.passthrough
             subtitleLabel.textColor = .secondaryLabelColor
         } else if let info = engine.info {
             titleLabel.stringValue = info.deviceName
-            let channels = info.outputChannels == 2 ? "stereo" : "\(info.outputChannels) ch"
-            let latency = engine.addedLatencySeconds * 1000
+            let channels = info.outputChannels == 2
+                ? strings.stereo
+                : String(format: strings.channelsFormat, info.outputChannels)
             subtitleLabel.stringValue = String(
                 format: "%d kHz · %@ · +%.0f ms",
-                Int(info.sampleRate / 1000), channels, latency)
+                Int(info.sampleRate / 1000), channels, engine.addedLatencySeconds * 1000)
             subtitleLabel.textColor = .secondaryLabelColor
         }
 
@@ -258,16 +284,16 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         let peak = linearToDecibels(engine.processor.outputPeak)
         let reduction = engine.processor.limiterReductionDecibels
-        meter.level = max(0, (peak + 60) / 60)          // −60…0 dBFS across the bar
+        meter.level = max(0, (peak + 60) / 60)          // −60…0 dBFS sobre la barra
         meter.isLimiting = reduction < -0.1
         meterLabel.stringValue = peak <= -59
-            ? "silent"
+            ? strings.silent
             : String(format: "%.1f dBFS%@", peak,
                      reduction < -0.1
-                        ? String(format: "   ·   limiting %.1f dB", reduction) : "")
+                        ? String(format: strings.limitingFormat, reduction) : "")
     }
 
-    // MARK: Actions
+    // MARK: Acciones
 
     func menuWillOpen(_ menu: NSMenu) {
         refreshChrome()
@@ -303,10 +329,15 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func bufferChosen(_ sender: NSMenuItem) {
-        let frames = Self.bufferChoices[sender.tag].frames
+        let frames = Self.bufferChoices[sender.tag]
         UserDefaults.standard.set(Int(frames), forKey: Defaults.bufferFrames)
         engine.preferredBufferFrames = frames == 0 ? nil : frames
         restartEngine()
+    }
+
+    @objc private func languageChosen(_ sender: NSMenuItem) {
+        AppLanguage.stored = AppLanguage.allCases[sender.tag]
+        rebuildMenu()
     }
 
     @objc private func retry() {
@@ -332,8 +363,8 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         engine.preferredBufferFrames = frames > 0 ? frames : nil
     }
 
-    /// Absent and "automatic" are different answers, so the stored value has to be
-    /// read as an optional rather than leaning on integer(forKey:) returning 0.
+    /// "Ausente" y "automático" son respuestas distintas, así que el valor guardado
+    /// se lee como opcional en vez de apoyarse en que integer(forKey:) devuelva 0.
     private func storedBufferFrames() -> UInt32 {
         guard let stored = UserDefaults.standard.object(forKey: Defaults.bufferFrames) as? Int
         else { return Self.defaultBufferFrames }

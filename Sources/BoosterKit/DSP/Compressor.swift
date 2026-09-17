@@ -1,13 +1,13 @@
 import Foundation
 
-/// A soft-knee downward compressor, used here as a gain computer: it answers
-/// "what should this frame be multiplied by", and the caller applies it.
+/// Compresor descendente con rodilla suave, usado acá como calculador de ganancia:
+/// responde "por cuánto hay que multiplicar este frame", y quien llama lo aplica.
 ///
-/// The threshold is deliberately high. A compressor exists here to tame what is
-/// approaching the ceiling, not to flatten everything — and **makeup gain is not
-/// optional**. Without it a compressor makes audio quieter, which is the opposite
-/// of what a booster is for. Makeup is derived from the curve itself: whatever
-/// the compressor would take off a full-scale signal is given back to everything.
+/// El umbral es alto a propósito. Un compresor está acá para domar lo que se
+/// acerca al techo, no para aplastar todo — y el **makeup no es opcional**. Sin él
+/// un compresor hace el audio *más bajo*, que es exactamente lo contrario de para
+/// qué existe un booster. El makeup sale de la curva misma: lo que el compresor le
+/// sacaría a una señal a fondo de escala se le devuelve a todo.
 public final class Compressor {
 
     public var thresholdDecibels: Float = -18
@@ -20,10 +20,10 @@ public final class Compressor {
     private var releaseCoefficient: Float = 0
     private var envelopeDecibels: Float = 0
 
-    /// Linear gain that compensates the curve, computed in `prepare`.
+    /// Ganancia lineal que compensa la curva, calculada en `prepare`.
     public private(set) var makeup: Float = 1
 
-    /// Gain reduction currently applied, in dB (<= 0). For metering.
+    /// Reducción de ganancia aplicada en este momento, en dB (≤ 0). Para el medidor.
     public var reductionDecibels: Float { envelopeDecibels }
 
     public init() { prepare(sampleRate: 48_000) }
@@ -40,21 +40,22 @@ public final class Compressor {
         envelopeDecibels = 0
     }
 
-    /// The static curve, without time constants: gain reduction in dB for a level.
-    /// Separated out so it can be tested on its own and so `prepare` can ask what
-    /// the curve does at full scale in order to derive makeup.
+    /// La curva estática, sin constantes de tiempo: reducción en dB para un nivel.
+    /// Está separada para poder testearla sola y para que `prepare` pueda
+    /// preguntarle qué hace a fondo de escala y de ahí derivar el makeup.
     public func staticReductionDecibels(forLevel levelDecibels: Float) -> Float {
         let over = levelDecibels - thresholdDecibels
         let halfKnee = kneeDecibels / 2
         if over <= -halfKnee { return 0 }
         let slope = 1 / ratio - 1
         if over >= halfKnee { return slope * over }
-        // Knee: quadratic interpolation, continuous in value and slope at both ends.
+        // Rodilla: interpolación cuadrática, continua en valor y pendiente en las
+        // dos puntas.
         let x = over + halfKnee
         return slope * x * x / (2 * kneeDecibels)
     }
 
-    /// Smoothed linear gain for a frame, makeup included.
+    /// Ganancia lineal suavizada para un frame, makeup incluido.
     @inline(__always)
     public func gain(forPeak peak: Float) -> Float {
         let target = staticReductionDecibels(forLevel: linearToDecibels(peak))

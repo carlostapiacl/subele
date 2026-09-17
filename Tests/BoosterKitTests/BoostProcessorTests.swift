@@ -2,10 +2,10 @@ import Foundation
 import Testing
 @testable import BoosterKit
 
-@Suite("BoostProcessor")
+@Suite("Cadena completa")
 struct BoostProcessorTests {
 
-    @Test("gain is exact while there is headroom", arguments: [
+    @Test("la ganancia es exacta mientras haya headroom", arguments: [
         (gain: Float(1), expected: Float(-20)),
         (gain: Float(3), expected: Float(-10.46)),
         (gain: Float(4), expected: Float(-7.96)),
@@ -17,21 +17,21 @@ struct BoostProcessorTests {
         #expect(abs(linearToDecibels(steadyStatePeak(output, channels: 2)) - expected) < 0.2)
     }
 
-    @Test("loudness mode lifts quiet material")
+    @Test("el modo loudness levanta el material bajo")
     func loudnessLifts() {
         let input = sine(decibels: -20, frames: 48_000, channels: 2)
         let transparent = render(makeProcessor(gain: 1, mode: .transparent), input, channels: 2)
         let loudness = render(makeProcessor(gain: 1, mode: .loudness), input, channels: 2)
         let lift = linearToDecibels(steadyStatePeak(loudness, channels: 2))
                  - linearToDecibels(steadyStatePeak(transparent, channels: 2))
-        // −18 dB threshold at 4:1 leaves +13.5 dB of makeup, minus what the curve
-        // takes off a −20 dBFS signal inside the knee.
+        // El umbral de −18 dB a 4:1 deja +13,5 dB de makeup, menos lo que la
+        // curva le saca a una señal de −20 dBFS dentro de la rodilla.
         #expect(abs(lift - 13.44) < 0.3)
     }
 
-    @Test("the result does not depend on the block size CoreAudio hands over")
+    @Test("el resultado no depende del tamaño de bloque que entregue CoreAudio")
     func blockSizeInvariant() {
-        // If this ever differs, state is being lost or reset between blocks.
+        // Si alguna vez difiere, hay estado perdiéndose o reiniciándose entre bloques.
         let channels = 2
         let frames = 12_000
         var input = [Float](repeating: 0, count: frames * channels)
@@ -47,10 +47,10 @@ struct BoostProcessorTests {
         #expect(zip(small, large).allSatisfy { $0 == $1 })
     }
 
-    @Test("bounded for any channel count", arguments: [1, 2, 4, 6, 8])
+    @Test("acotado para cualquier conteo de canales", arguments: [1, 2, 4, 6, 8])
     func boundedForEveryChannelCount(channels: Int) {
-        // The delay line uses a fixed stride, so an unusual channel count is
-        // exactly where an index would run off the end.
+        // La línea de retardo usa un paso fijo, así que un conteo de canales raro
+        // es justo donde un índice se saldría del final.
         let processor = makeProcessor(gain: 3, mode: .loudness, channels: channels)
         let output = render(processor, sine(decibels: -6, frames: 4_800, channels: channels),
                             channels: channels)
@@ -58,10 +58,10 @@ struct BoostProcessorTests {
         #expect(linearToDecibels(peak(output)) <= ceilingDecibels + 0.05)
     }
 
-    @Test("NaN and infinity cannot poison the chain")
+    @Test("NaN e infinito no pueden envenenar la cadena")
     func survivesNonFiniteInput() {
-        // A single NaN propagates through every comparison. Without sanitising,
-        // the compressor envelope never recovers and the output dies for good.
+        // Un solo NaN se propaga por toda comparación. Sin sanear, el envolvente
+        // del compresor no se recupera nunca y la salida se muere para siempre.
         let channels = 2
         var input = sine(decibels: -12, frames: 4_800, channels: channels)
         input[100] = .nan
@@ -70,12 +70,12 @@ struct BoostProcessorTests {
         let output = render(makeProcessor(gain: 2, mode: .loudness), input, channels: channels)
 
         #expect(output.allSatisfy { $0.isFinite })
-        // Still alive afterwards: a dead output would also be finite.
+        // Sigue viva después: una salida muerta también sería finita.
         let tail = Array(output[(output.count / 2)...])
         #expect(peak(tail) > 0.01)
     }
 
-    @Test("silence in, silence out")
+    @Test("entra silencio, sale silencio")
     func silenceStaysSilent() {
         let processor = makeProcessor(gain: 4, mode: .loudness)
         let output = render(processor, [Float](repeating: 0, count: 9_600), channels: 2)

@@ -1,10 +1,10 @@
 import CoreAudio
 import Foundation
 
-/// An error from a CoreAudio call.
+/// Un error de una llamada a CoreAudio.
 ///
-/// `OSStatus` values here are four-character codes. Printed as a decimal they
-/// tell you nothing, so the code is always rendered back into its characters.
+/// Los `OSStatus` de acá son códigos de cuatro caracteres. Impresos en decimal no
+/// dicen nada, así que el código siempre se devuelve a sus caracteres.
 public struct AudioError: LocalizedError {
     public let message: String
     public let status: OSStatus?
@@ -20,8 +20,8 @@ public struct AudioError: LocalizedError {
     }
 }
 
-/// Renders an `OSStatus` back into the four characters it was built from,
-/// falling back to the number when the bytes are not printable.
+/// Reconstruye un `OSStatus` en los cuatro caracteres con que fue armado, y cae al
+/// número cuando los bytes no son imprimibles.
 public func fourCharCode(_ status: OSStatus) -> String {
     let value = UInt32(bitPattern: status)
     let bytes = [UInt8((value >> 24) & 0xff), UInt8((value >> 16) & 0xff),
@@ -38,10 +38,11 @@ func check(_ status: OSStatus, _ what: String) throws -> OSStatus {
     return status
 }
 
-/// A thin, typed wrapper over the `AudioObjectGetPropertyData` family.
+/// Envoltorio tipado y delgado sobre la familia `AudioObjectGetPropertyData`.
 ///
-/// Every call in that API is the same six-argument shape with an inout size and
-/// a raw pointer. Wrapping it once keeps that shape out of the rest of the code.
+/// Todas las llamadas de esa API tienen la misma forma de seis argumentos, con un
+/// tamaño por referencia y un puntero crudo. Envolverla una vez deja esa forma
+/// fuera del resto del código.
 public enum AudioObject {
 
     public static let system = AudioObjectID(kAudioObjectSystemObject)
@@ -54,7 +55,7 @@ public enum AudioObject {
         AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: element)
     }
 
-    /// Reads a fixed-size property into a value of type `T`.
+    /// Lee una propiedad de tamaño fijo en un valor de tipo `T`.
     static func value<T>(
         _ objectID: AudioObjectID,
         _ selector: AudioObjectPropertySelector,
@@ -69,8 +70,8 @@ public enum AudioObject {
         return value
     }
 
-    /// Reads a fixed-size property, returning nil instead of throwing.
-    /// For values that are informative but not required, such as latency.
+    /// Lee una propiedad de tamaño fijo devolviendo nil en vez de lanzar, para
+    /// valores que son informativos pero no imprescindibles, como la latencia.
     static func optionalValue<T>(
         _ objectID: AudioObjectID,
         _ selector: AudioObjectPropertySelector,
@@ -80,7 +81,7 @@ public enum AudioObject {
         try? value(objectID, selector, scope: scope, initial: initial, describing: "")
     }
 
-    /// Writes a fixed-size property.
+    /// Escribe una propiedad de tamaño fijo.
     static func setValue<T>(
         _ objectID: AudioObjectID,
         _ selector: AudioObjectPropertySelector,
@@ -94,8 +95,8 @@ public enum AudioObject {
                                              UInt32(MemoryLayout<T>.size), &value), what)
     }
 
-    /// Reads a `CFString` property. CoreAudio hands back a +1 reference, which
-    /// the local `CFString?` then owns and releases — the counts balance.
+    /// Lee una propiedad `CFString`. CoreAudio devuelve una referencia con +1, que
+    /// el `CFString?` local pasa a poseer y después libera — las cuentas cierran.
     static func string(
         _ objectID: AudioObjectID,
         _ selector: AudioObjectPropertySelector,
@@ -112,11 +113,12 @@ public enum AudioObject {
     }
 }
 
-/// Unbuffered tracing to stderr, enabled with `BOOSTER_TRACE=1`.
+/// Traza sin búfer a stderr, se enciende con `BOOSTER_TRACE=1`.
 ///
-/// CoreAudio calls can block indefinitely without returning an error — a tap on a
-/// device owned by another virtual driver does exactly that. When stdout is
-/// buffered such a hang leaves no trace at all, so the steps are marked here.
+/// Las llamadas a CoreAudio pueden bloquearse indefinidamente sin devolver error
+/// — un tap sobre un dispositivo que es dueño otro driver virtual hace exactamente
+/// eso. Con stdout bufferizado, un cuelgue así no deja ningún rastro, así que los
+/// pasos se marcan por acá.
 public func trace(_ message: @autoclosure () -> String) {
     guard ProcessInfo.processInfo.environment["BOOSTER_TRACE"] != nil else { return }
     FileHandle.standardError.write("[trace] \(message())\n".data(using: .utf8)!)
