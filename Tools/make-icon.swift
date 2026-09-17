@@ -168,4 +168,12 @@ for variant in variants {
     let url = iconset.appendingPathComponent("\(variant.name).png")
     try renderPNG(size: variant.size).write(to: url)
 }
+
+// El sitio de GitHub Pages necesita el ícono como archivo servible, así que sale
+// del mismo generador: si el dibujo cambia, la página cambia con él.
+let siteIcon = URL(fileURLWithPath: "docs/icon.png")
+if FileManager.default.fileExists(atPath: "docs") {
+    try renderPNG(size: 512).write(to: siteIcon)
+}
+
 print("iconset escrito en \(iconset.path)")

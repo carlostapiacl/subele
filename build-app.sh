@@ -12,8 +12,26 @@ ID="cl.carlostapia.audio-booster"
 # Una sola fuente de verdad para la versión: la del código.
 VERSION=$(sed -n 's/.*let version = "\(.*\)"/\1/p' Sources/BoosterKit/Booster.swift)
 
-echo "▸ Compilando release…"
-swift build -c release
+# Universal: arm64 + x86_64 en un solo binario.
+#
+# Sin esto el .dmg solo sirve en la arquitectura de quien lo compiló, y los
+# runners de GitHub son Apple Silicon — o sea que la release quedaba rota en toda
+# Mac Intel, con el mensaje inútil "no tiene el formato de ejecutable correcto".
+#
+# Se compila una arquitectura por vez y se unen con lipo, en vez de usar
+# `swift build --arch a --arch b`: esa forma necesita xcbuild, que viene con Xcode
+# completo, y este proyecto se compila con las Command Line Tools solas.
+build_arch () {   # $1 = arquitectura
+    local triple="$1-apple-macosx14.2"
+    echo "   $1…"
+    swift build -c release --scratch-path ".build-$1" \
+        -Xswiftc -target -Xswiftc "$triple" \
+        -Xcc -target -Xcc "$triple" >/dev/null
+}
+
+echo "▸ Compilando release (universal)…"
+build_arch x86_64
+build_arch arm64
 
 echo "▸ Tests…"
 swift test
@@ -25,7 +43,10 @@ iconutil -c icns Tools/AppIcon.iconset -o Tools/AppIcon.icns
 echo "▸ Armando ${APP}…"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp .build/release/booster "$APP/Contents/MacOS/booster"
+lipo -create \
+    ".build-x86_64/release/booster" \
+    ".build-arm64/release/booster" \
+    -output "$APP/Contents/MacOS/booster"
 cp Tools/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
@@ -63,6 +84,7 @@ codesign --force --sign - --timestamp=none "$APP" 2>&1 | sed 's/^/   /'
 
 echo "▸ Verificando…"
 codesign --verify --verbose=1 "$APP" 2>&1 | sed 's/^/   /'
+lipo -archs "$APP/Contents/MacOS/booster" | sed 's/^/   arquitecturas: /'
 
 echo
 echo "  Listo:   $(pwd)/$APP"

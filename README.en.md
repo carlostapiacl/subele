@@ -125,7 +125,8 @@ same setting.
 
 ## Requirements
 
-macOS 14.2 or later and the Swift toolchain. Xcode Command Line Tools are enough —
+macOS 14.2 or later, Intel or Apple Silicon (the `.dmg` ships a universal
+binary), and the Swift toolchain to build it. Xcode Command Line Tools are enough —
 this project is built without Xcode.
 
 ## Install
@@ -262,6 +263,10 @@ can be embedded in something else.
 
 > Source comments are in Spanish — this is a Spanish-language project with a
 > bilingual interface. The public API names and this document are in English.
+
+## Site
+
+[carlostapiacl.github.io/audio-booster](https://carlostapiacl.github.io/audio-booster/) — the project page, in `docs/`.
 
 ## License
 

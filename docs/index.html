@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audio Booster — sube el volumen de macOS sin instalar drivers</title>
+<meta name="description" content="Sube macOS más allá del 100% sin instalar drivers. Construido sobre la API de process tap de macOS 14.2, con un limitador de lookahead para que no clipee.">
+<link rel="icon" href="icon.png">
+<meta property="og:title" content="Audio Booster">
+<meta property="og:description" content="Sube el volumen de macOS más allá del 100% sin instalar drivers.">
+<meta property="og:image" content="icon.png">
+<style>
+  :root {
+    --ink: #0d0b24;
+    --ink-2: #171440;
+    --indigo: #6c7aff;
+    --amber: #ffb020;
+    --text: #e8e7f5;
+    --muted: #9a97bd;
+    --line: rgba(255,255,255,.1);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--text);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--indigo); }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+
+  header {
+    text-align: center;
+    padding: 72px 0 56px;
+    background:
+      radial-gradient(90% 120% at 50% -20%, rgba(108,122,255,.32), transparent 60%),
+      linear-gradient(180deg, var(--ink-2), var(--ink));
+    border-bottom: 1px solid var(--line);
+  }
+  header img { width: 132px; height: 132px; border-radius: 28px; }
+  h1 { font-size: 40px; letter-spacing: -.02em; margin: 22px 0 8px; }
+  .tag { color: var(--muted); font-size: 18px; margin: 0 auto 32px; max-width: 30em; }
+
+  .buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 13px 26px; border-radius: 11px;
+    font-weight: 600; text-decoration: none; font-size: 16px;
+    background: var(--indigo); color: #fff; border: 1px solid transparent;
+  }
+  .btn:hover { filter: brightness(1.12); }
+  .btn.ghost { background: transparent; color: var(--text); border-color: var(--line); }
+  .req { color: var(--muted); font-size: 13.5px; margin-top: 16px; }
+
+  section { padding: 52px 0; border-bottom: 1px solid var(--line); }
+  h2 { font-size: 22px; letter-spacing: -.01em; margin: 0 0 14px; }
+  p { margin: 0 0 15px; }
+  .muted { color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 15px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  td.good { color: var(--amber); }
+  tr.hi td { background: rgba(255,176,32,.07); }
+
+  .note {
+    background: rgba(255,176,32,.08);
+    border: 1px solid rgba(255,176,32,.3);
+    border-radius: 12px; padding: 18px 20px; margin: 20px 0;
+  }
+  .note h3 { margin: 0 0 8px; font-size: 16px; color: var(--amber); }
+  code {
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: rgba(255,255,255,.08); padding: 2px 6px; border-radius: 5px;
+  }
+  pre {
+    background: rgba(0,0,0,.35); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 16px; overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  ol { padding-left: 20px; }
+  ol li { margin-bottom: 7px; }
+
+  footer { padding: 36px 0 56px; text-align: center; color: var(--muted); font-size: 14px; }
+
+  .lang { position: fixed; top: 16px; right: 16px; display: flex; gap: 4px; z-index: 10; }
+  .lang button {
+    background: rgba(255,255,255,.07); color: var(--muted); border: 1px solid var(--line);
+    border-radius: 8px; padding: 5px 11px; font-size: 13px; font-weight: 600; cursor: pointer;
+    font-family: inherit;
+  }
+  .lang button[aria-pressed="true"] { background: var(--indigo); color: #fff; border-color: transparent; }
+  [data-lang] { display: none; }
+  [data-lang].on { display: block; }
+  th[data-lang].on, td[data-lang].on { display: table-cell; }
+  span[data-lang].on { display: inline; }
+</style>
+</head>
+<body>
+
+<div class="lang">
+  <button id="btn-es" aria-pressed="true" onclick="setLang('es')">ES</button>
+  <button id="btn-en" aria-pressed="false" onclick="setLang('en')">EN</button>
+</div>
+
+<header>
+  <div class="wrap">
+    <img src="icon.png" alt="Audio Booster">
+    <h1>Audio Booster</h1>
+    <p class="tag" data-lang="es" class="on">Sube el volumen de macOS más allá del 100% sin instalar drivers, y sin que suene a parlante reventado.</p>
+    <p class="tag" data-lang="en">Turn macOS past 100% without installing a driver, and without it sounding like a blown speaker.</p>
+    <div class="buttons">
+      <a class="btn" href="https://github.com/carlostapiacl/subele/releases/latest">
+        <span data-lang="es">Descargar para macOS</span><span data-lang="en">Download for macOS</span>
+      </a>
+      <a class="btn ghost" href="https://github.com/carlostapiacl/subele">
+        <span data-lang="es">Ver el código</span><span data-lang="en">View the source</span>
+      </a>
+    </div>
+    <p class="req">
+      <span data-lang="es">macOS 14.2 o posterior · Intel y Apple Silicon · gratis y MIT</span>
+      <span data-lang="en">macOS 14.2 or later · Intel and Apple Silicon · free and MIT</span>
+    </p>
+  </div>
+</header>
+
+<section><div class="wrap">
+  <div data-lang="es">
+    <h2>Por qué es distinto</h2>
+    <p>Todos los amplificadores de volumen de macOS funcionan igual desde hace una década: instalan un driver de audio, se ponen como salida por defecto del sistema y pasan el audio hacia el hardware real. Driver que firmar, instalador, <code>sudo</code>, tu salida secuestrada, y algo que se rompe en cada actualización.</p>
+    <p><strong>macOS 14.2 volvió todo eso innecesario.</strong> <code>AudioHardwareCreateProcessTap</code> es una API pública que captura lo que otros procesos reproducen, sin driver de por medio.</p>
+    <table>
+      <tr><th></th><th>Boosters con driver</th><th>Audio Booster</th></tr>
+      <tr><td>Instala driver</td><td>sí, con <code>sudo</code></td><td class="good">no</td></tr>
+      <tr><td>Toma tu salida por defecto</td><td>sí</td><td class="good">no</td></tr>
+      <tr><td>Al subir el volumen</td><td>ganancia cruda, clipping</td><td class="good">limitador con lookahead</td></tr>
+      <tr><td>Desinstalar</td><td>sacar el driver</td><td class="good">borrar la app</td></tr>
+    </table>
+  </div>
+  <div data-lang="en">
+    <h2>Why it is different</h2>
+    <p>Every volume booster on macOS has worked the same way for a decade: install an audio driver, make itself the system's default output, and pass audio through to the real hardware. A driver to sign, an installer, <code>sudo</code>, your output device hijacked, and something that breaks with every OS update.</p>
+    <p><strong>macOS 14.2 made all of that unnecessary.</strong> <code>AudioHardwareCreateProcessTap</code> is a public API that captures what other processes are playing, with no driver involved.</p>
+    <table>
+      <tr><th></th><th>Driver-based boosters</th><th>Audio Booster</th></tr>
+      <tr><td>Installs a driver</td><td>yes, with <code>sudo</code></td><td class="good">no</td></tr>
+      <tr><td>Takes over default output</td><td>yes</td><td class="good">no</td></tr>
+      <tr><td>Turning it up</td><td>raw gain, clipping</td><td class="good">lookahead limiter</td></tr>
+      <tr><td>Uninstall</td><td>remove the driver</td><td class="good">delete the app</td></tr>
+    </table>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div data-lang="es">
+    <h2>El limitador</h2>
+    <p>Multiplicar una señal por tres significa que todo lo que pasaba de un tercio de escala queda con las puntas cortadas, y una onda cortada es ese sonido fino y a lata del «volumen aumentado». Acá:</p>
+    <ol>
+      <li>La señal se retrasa 3 ms.</li>
+      <li>Se calcula la ganancia que cada frame necesitaría para no pasar el techo.</li>
+      <li>Una cola monótona mantiene el mínimo corrido de esas ganancias sobre toda la ventana.</li>
+      <li>El frame que sale ya viene multiplicado por la ganancia más baja que va a hacer falta.</li>
+    </ol>
+    <p>Desbordar es <strong>imposible por construcción</strong>, no por haber ajustado constantes hasta que se viera bien.</p>
+  </div>
+  <div data-lang="en">
+    <h2>The limiter</h2>
+    <p>Multiplying a signal by three means everything above a third of full scale gets its tops shorn off, and sheared waveforms are that thin, tinny "boosted" sound. Here:</p>
+    <ol>
+      <li>The signal is delayed by 3 ms.</li>
+      <li>The gain each frame would need to stay under the ceiling is computed.</li>
+      <li>A monotonic queue keeps the running minimum of those gains across the window.</li>
+      <li>The frame leaving the delay is already multiplied by the lowest gain that will be needed.</li>
+    </ol>
+    <p>Overshoot is <strong>impossible by construction</strong>, not by tuning constants until it looks fine.</p>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div data-lang="es">
+    <h2>Latencia</h2>
+    <p>Medida sobre los timestamps del propio callback de audio, no estimada. La cadena cuesta unos dos períodos de buffer más los 3 ms de lookahead.</p>
+    <table>
+      <tr><th>Buffer</th><th>Latencia agregada</th></tr>
+      <tr><td>128 frames</td><td>8,8 ms</td></tr>
+      <tr class="hi"><td>256 frames (por defecto)</td><td>14,6 ms</td></tr>
+      <tr><td>512 frames</td><td>26,2 ms</td></tr>
+    </table>
+    <p class="muted">A la música no le importa en ninguno de los tres. Al video puede que sí, y por eso el default no es el que elige macOS solo.</p>
+  </div>
+  <div data-lang="en">
+    <h2>Latency</h2>
+    <p>Measured from the audio callback's own timestamps, not estimated. The chain costs about two buffer periods plus the 3 ms lookahead.</p>
+    <table>
+      <tr><th>Buffer</th><th>Added latency</th></tr>
+      <tr><td>128 frames</td><td>8.8 ms</td></tr>
+      <tr class="hi"><td>256 frames (default)</td><td>14.6 ms</td></tr>
+      <tr><td>512 frames</td><td>26.2 ms</td></tr>
+    </table>
+    <p class="muted">Music will not care at any of these. Video might, which is why the default is not what macOS picks on its own.</p>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div data-lang="es">
+    <h2>Instalación</h2>
+    <p>Abrí el <code>.dmg</code> y arrastrá Audio Booster a Aplicaciones.</p>
+    <div class="note">
+      <h3>macOS la va a bloquear la primera vez</h3>
+      <p>La app está firmada pero <strong>no notarizada</strong>: notarizar exige una cuenta de Apple Developer paga. Vas a ver «Apple no pudo verificar que esté libre de malware». Para destrabarla:</p>
+      <p><strong>Ajustes del Sistema → Privacidad y seguridad</strong>, bajá hasta el aviso y tocá <strong>Abrir igualmente</strong>. O en la Terminal:</p>
+      <pre><code>xattr -d com.apple.quarantine "/Applications/Audio Booster.app"</code></pre>
+      <p class="muted" style="margin-bottom:0">En macOS 15 el viejo Control-clic → Abrir ya no alcanza.</p>
+    </div>
+    <p>Si preferís no confiar en un binario sin notarizar —razonable—, compilala vos. No necesita Xcode:</p>
+    <pre><code>git clone https://github.com/carlostapiacl/subele
+cd audio-booster
+./build-app.sh</code></pre>
+  </div>
+  <div data-lang="en">
+    <h2>Install</h2>
+    <p>Open the <code>.dmg</code> and drag Audio Booster to Applications.</p>
+    <div class="note">
+      <h3>macOS will block it the first time</h3>
+      <p>The app is signed but <strong>not notarised</strong> — notarisation requires a paid Apple Developer account. You will see "Apple could not verify this app is free of malware". To get past it:</p>
+      <p><strong>System Settings → Privacy &amp; Security</strong>, scroll to the notice and click <strong>Open Anyway</strong>. Or in Terminal:</p>
+      <pre><code>xattr -d com.apple.quarantine "/Applications/Audio Booster.app"</code></pre>
+      <p class="muted" style="margin-bottom:0">On macOS 15 the old Control-click → Open trick is no longer enough.</p>
+    </div>
+    <p>If you would rather not trust an un-notarised binary — fair — build it yourself. No Xcode needed:</p>
+    <pre><code>git clone https://github.com/carlostapiacl/subele
+cd audio-booster
+./build-app.sh</code></pre>
+  </div>
+</div></section>
+
+<footer>
+  <p>
+    MIT · <a href="https://github.com/carlostapiacl/subele">GitHub</a> ·
+    <span data-lang="es">hecho por</span><span data-lang="en">built by</span>
+    <a href="https://carlostapia.cl">Carlos Tapia</a>
+  </p>
+</footer>
+
+<script>
+  function setLang(lang) {
+    document.documentElement.lang = lang;
+    document.querySelectorAll('[data-lang]').forEach(function (el) {
+      el.classList.toggle('on', el.dataset.lang === lang);
+    });
+    document.getElementById('btn-es').setAttribute('aria-pressed', lang === 'es');
+    document.getElementById('btn-en').setAttribute('aria-pressed', lang === 'en');
+    try { localStorage.setItem('lang', lang); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('lang'); } catch (e) {}
+  setLang(saved || ((navigator.language || 'en').startsWith('es') ? 'es' : 'en'));
+</script>
+</body>
+</html>

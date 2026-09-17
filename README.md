@@ -126,7 +126,8 @@ defecto sigue al idioma del sistema. La consola usa el mismo ajuste.
 
 ## Requisitos
 
-macOS 14.2 o posterior y la cadena de herramientas de Swift. Las Command Line
+macOS 14.2 o posterior, Intel o Apple Silicon (el `.dmg` trae un binario
+universal), y la cadena de herramientas de Swift para compilar. Las Command Line
 Tools de Xcode alcanzan: este proyecto se compila sin Xcode.
 
 ## Instalación
@@ -262,6 +263,10 @@ Tests/BoosterKitTests/
 
 `BoosterKit` no depende de AppKit ni sabe que existe una interfaz, así que el
 motor se puede embeber en otra cosa.
+
+## Sitio
+
+[carlostapiacl.github.io/audio-booster](https://carlostapiacl.github.io/audio-booster/) — la página del proyecto, en `docs/`.
 
 ## Licencia
 
