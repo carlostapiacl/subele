@@ -266,12 +266,17 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         let running = isEnabled && lastError == nil
-        let symbol = lastError != nil ? "exclamationmark.triangle.fill"
-                   : !isEnabled ? "speaker.slash.fill"
-                   : engine.processor.gain > 1.01 ? "speaker.wave.3.fill"
-                   : "speaker.wave.2.fill"
-        statusItem.button?.image = NSImage(systemSymbolName: symbol,
-                                           accessibilityDescription: "Audio Booster")
+        // Los estados excepcionales usan símbolos del sistema, que la gente ya
+        // sabe leer. El estado normal usa el ícono propio: un parlante genérico
+        // se confunde con el control de volumen de macOS y con cualquier otra app
+        // de audio de la barra.
+        if let symbol = lastError != nil ? "exclamationmark.triangle.fill"
+                      : !isEnabled ? "speaker.slash.fill" : nil {
+            statusItem.button?.image = NSImage(systemSymbolName: symbol,
+                                               accessibilityDescription: "Audio Booster")
+        } else {
+            statusItem.button?.image = MenuBarIcon.image(boosted: engine.processor.gain > 1.01)
+        }
         statusItem.button?.title = (running && percent != 100) ? " \(percent)%" : ""
     }
 
