@@ -268,6 +268,11 @@ motor se puede embeber en otra cosa.
 
 [carlostapiacl.github.io/audio-booster](https://carlostapiacl.github.io/audio-booster/) — la página del proyecto, en `docs/`.
 
+## Apoyar
+
+Es gratis y va a seguir siéndolo. Si te resultó útil y querés colaborar:
+[PayPal](https://paypal.me/carlostapiacl). Y si no, usala igual.
+
 ## Licencia
 
 MIT © Carlos Tapia

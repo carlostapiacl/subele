@@ -268,6 +268,11 @@ can be embedded in something else.
 
 [carlostapiacl.github.io/audio-booster](https://carlostapiacl.github.io/audio-booster/) — the project page, in `docs/`.
 
+## Support
+
+It is free and will stay that way. If you found it useful and want to chip in:
+[PayPal](https://paypal.me/carlostapiacl). And if not, use it anyway.
+
 ## License
 
 MIT © Carlos Tapia
