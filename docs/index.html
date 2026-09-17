@@ -52,6 +52,8 @@
   .btn:hover { filter: brightness(1.12); }
   .btn.ghost { background: transparent; color: var(--text); border-color: var(--line); }
   .req { color: var(--muted); font-size: 13.5px; margin-top: 16px; }
+  .req.open { margin-top: 6px; }
+  .req.open strong { color: var(--text); }
 
   section { padding: 52px 0; border-bottom: 1px solid var(--line); }
   h2 { font-size: 22px; letter-spacing: -.01em; margin: 0 0 14px; }
@@ -119,8 +121,12 @@
       </a>
     </div>
     <p class="req">
-      <span data-lang="es">macOS 14.2 o posterior · Intel y Apple Silicon · gratis y MIT</span>
-      <span data-lang="en">macOS 14.2 or later · Intel and Apple Silicon · free and MIT</span>
+      <span data-lang="es">macOS 14.2 o posterior · Intel y Apple Silicon · gratis, sin cuenta, sin telemetría</span>
+      <span data-lang="en">macOS 14.2 or later · Intel and Apple Silicon · free, no account, no telemetry</span>
+    </p>
+    <p class="req open">
+      <span data-lang="es"><strong>Código abierto (MIT).</strong> Todo lo que corre en tu máquina está a la vista: <a href="https://github.com/carlostapiacl/subele">leelo antes de instalarlo</a>.</span>
+      <span data-lang="en"><strong>Open source (MIT).</strong> Everything that runs on your machine is out in the open: <a href="https://github.com/carlostapiacl/subele">read it before you install it</a>.</span>
     </p>
   </div>
 </header>
@@ -203,6 +209,23 @@
 </div></section>
 
 <section><div class="wrap">
+  <div data-lang="es">
+    <h2>Código abierto, y acá importa más que de costumbre</h2>
+    <p>Esta app <strong>captura todo el audio de tu sistema</strong>. Es lo que tiene que hacer para funcionar, pero significa que te está pidiendo un permiso enorme. No deberías dárselo a un binario que no podés leer.</p>
+    <p>Todo el código está publicado bajo licencia MIT: el motor de audio, el procesamiento, la interfaz, el script que arma la app e incluso el que dibuja el ícono. Podés leer exactamente qué hace con el audio y comprobar que no sale de tu máquina — no hay servidor, no hay cuenta, no hay telemetría, no hay red.</p>
+    <p>Y si preferís no confiar en el <code>.dmg</code> que yo publiqué, <a href="#instalacion">compilalo vos</a> desde el mismo código. Sale idéntico.</p>
+    <p><a class="btn ghost" href="https://github.com/carlostapiacl/subele">Ver el código en GitHub</a></p>
+  </div>
+  <div data-lang="en">
+    <h2>Open source, and here it matters more than usual</h2>
+    <p>This app <strong>captures all of your system audio</strong>. That is what it has to do in order to work, but it means it is asking you for an enormous permission. You should not grant that to a binary you cannot read.</p>
+    <p>All of the code is published under the MIT licence: the audio engine, the processing, the interface, the script that assembles the app, even the one that draws the icon. You can read exactly what it does with your audio and confirm that none of it leaves your machine — there is no server, no account, no telemetry, no network.</p>
+    <p>And if you would rather not trust the <code>.dmg</code> I published, <a href="#instalacion">build it yourself</a> from the same source. It comes out identical.</p>
+    <p><a class="btn ghost" href="https://github.com/carlostapiacl/subele">View the source on GitHub</a></p>
+  </div>
+</div></section>
+
+<section id="instalacion"><div class="wrap">
   <div data-lang="es">
     <h2>Instalación</h2>
     <p>Abrí el <code>.dmg</code> y arrastrá Audio Booster a Aplicaciones.</p>
