@@ -9,7 +9,8 @@ cd "$(dirname "$0")"
 
 APP="Audio Booster.app"
 ID="cl.carlostapia.audio-booster"
-VERSION="0.1.0"
+# Una sola fuente de verdad para la versión: la del código.
+VERSION=$(sed -n 's/.*let version = "\(.*\)"/\1/p' Sources/BoosterKit/Booster.swift)
 
 echo "▸ Compilando release…"
 swift build -c release

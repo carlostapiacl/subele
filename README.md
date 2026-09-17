@@ -131,6 +131,31 @@ Tools de Xcode alcanzan: este proyecto se compila sin Xcode.
 
 ## Instalación
 
+### Descargar
+
+Bajá el `.dmg` de la [última versión](https://github.com/carlostapiacl/subele/releases/latest),
+abrilo y arrastrá **Audio Booster** a Aplicaciones.
+
+**La primera vez macOS la va a bloquear.** La app está firmada ad-hoc pero **no
+notarizada**: notarizar exige una cuenta de Apple Developer de pago (USD 99 al
+año). Vas a ver *"Apple no pudo verificar que esté libre de malware"*. Para
+destrabarla, una de estas dos:
+
+- **Ajustes del Sistema → Privacidad y seguridad**, bajá hasta el aviso sobre
+  Audio Booster y tocá **Abrir igualmente**.
+- O en la Terminal:
+  ```bash
+  xattr -d com.apple.quarantine "/Applications/Audio Booster.app"
+  ```
+
+En macOS 15 el viejo truco de Control-clic → Abrir ya no alcanza; hay que pasar
+por Ajustes del Sistema.
+
+### Compilar
+
+Si preferís no confiar en un binario sin notarizar —razonable—, son unos
+segundos:
+
 ```bash
 git clone https://github.com/carlostapiacl/subele
 cd audio-booster
@@ -142,6 +167,9 @@ open "Audio Booster.app"
 mano (SwiftPM no produce bundles) y lo firma ad-hoc. La firma ad-hoc alcanza para
 correrlo en la máquina que lo compiló; distribuirlo pediría un certificado
 Developer ID y notarización.
+
+`Tools/make-dmg.sh` arma el `.dmg` descargable, y el workflow `release.yml` lo
+publica solo al empujar una etiqueta `v*`.
 
 El ícono se genera por código en `Tools/make-icon.swift`, así que se revisa en
 diff como cualquier otro archivo en vez de ser un binario opaco. Dibuja un dial

@@ -62,6 +62,7 @@ struct Strings {
     let transparent: String
     let loudness: String
     let notRunning: String
+    let starting: String
     let disabled: String
     let passthrough: String
     let silent: String
@@ -112,6 +113,7 @@ struct Strings {
         transparent: "Transparent",
         loudness: "Loudness",
         notRunning: "Not running",
+        starting: "Starting…",
         disabled: "Disabled",
         passthrough: "Audio passes through untouched",
         silent: "silent",
@@ -181,6 +183,7 @@ struct Strings {
         transparent: "Transparente",
         loudness: "Loudness",
         notRunning: "No está corriendo",
+        starting: "Arrancando…",
         disabled: "Desactivado",
         passthrough: "El audio pasa sin tocar",
         silent: "silencio",

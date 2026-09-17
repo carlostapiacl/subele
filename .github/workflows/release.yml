@@ -1,0 +1,67 @@
+name: release
+
+# Publica un .dmg descargable cuando se empuja una etiqueta de versión:
+#   git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compilar, testear y empaquetar
+        run: |
+          ./build-app.sh
+          ./Tools/make-dmg.sh
+
+      - name: Publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.dmg \
+            --title "Audio Booster $GITHUB_REF_NAME" \
+            --notes-file - <<'NOTES'
+          ## Instalación
+
+          Descargá el `.dmg`, abrilo y arrastrá **Audio Booster** a Aplicaciones.
+
+          ### La primera vez macOS la va a bloquear
+
+          La app está firmada ad-hoc pero **no notarizada** — notarizar exige una
+          cuenta de Apple Developer de pago. Al abrirla vas a ver *"Apple no pudo
+          verificar que esté libre de malware"*.
+
+          Para destrabarla, una de estas dos:
+
+          - **Ajustes del Sistema → Privacidad y seguridad**, bajá hasta el aviso
+            sobre Audio Booster y tocá **Abrir igualmente**.
+          - O en la Terminal:
+            ```
+            xattr -d com.apple.quarantine "/Applications/Audio Booster.app"
+            ```
+
+          Si preferís no confiar en un binario sin notarizar —razonable—, compilala
+          vos: `./build-app.sh`. Son unos segundos y no necesita Xcode.
+
+          ---
+
+          <details>
+          <summary>English</summary>
+
+          Download the `.dmg`, open it and drag **Audio Booster** to Applications.
+
+          The app is ad-hoc signed but **not notarised**, so macOS will block it the
+          first time. Either go to **System Settings → Privacy & Security** and click
+          **Open Anyway**, or run
+          `xattr -d com.apple.quarantine "/Applications/Audio Booster.app"`.
+
+          Or build it yourself with `./build-app.sh` — it takes seconds and needs no
+          Xcode.
+          </details>
+          NOTES

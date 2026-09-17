@@ -53,7 +53,10 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var bufferItems: [NSMenuItem] = []
     private var languageItems: [NSMenuItem] = []
 
-    private var strings: Strings { Strings.current }
+    /// Cacheado, no calculado. `Strings.current` devuelve un struct con treinta
+    /// campos String: leerlo en cada tick del medidor eran treinta retains, veinte
+    /// veces por segundo, para un valor que solo cambia cuando cambia el idioma.
+    private var strings = Strings.current
 
     // MARK: Ciclo de vida
 
@@ -254,6 +257,12 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             titleLabel.stringValue = strings.disabled
             subtitleLabel.stringValue = strings.passthrough
             subtitleLabel.textColor = .secondaryLabelColor
+        } else if engine.info == nil {
+            // Ventana corta mientras se rehace la cadena tras un cambio de
+            // dispositivo. Sin esto quedaba en pantalla el dispositivo anterior.
+            titleLabel.stringValue = strings.starting
+            subtitleLabel.stringValue = ""
+            subtitleLabel.textColor = .secondaryLabelColor
         } else if let info = engine.info {
             titleLabel.stringValue = info.deviceName
             let channels = info.outputChannels == 2
@@ -342,6 +351,7 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func languageChosen(_ sender: NSMenuItem) {
         AppLanguage.stored = AppLanguage.allCases[sender.tag]
+        strings = Strings.current
         rebuildMenu()
     }
 

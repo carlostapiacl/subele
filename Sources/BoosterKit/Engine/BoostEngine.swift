@@ -41,7 +41,7 @@ public final class BoostEngine {
 
     /// Medida, no estimada: la distancia entre el timestamp del audio que entra y
     /// el timestamp en que se va a reproducir, tomada del IOProc.
-    public private(set) var measuredIOLatencySeconds: Double = 0
+    public var measuredIOLatencySeconds: Double { latencyBox.pointee }
 
     /// Todo lo que esta cadena agrega por sobre reproducir derecho al dispositivo.
     public var addedLatencySeconds: Double {
@@ -59,16 +59,28 @@ public final class BoostEngine {
     private let maximumFrames = 8192
     private let scratch: UnsafeMutablePointer<Float>
 
+    /// La latencia medida vive en un puntero crudo, no en una propiedad del motor.
+    /// El callback necesita escribirla, y llegar hasta `self` desde ahí obligaría a
+    /// capturarlo débil: una carga de referencia débil **toma un lock** en el
+    /// runtime de Swift, y un lock en el hilo de audio es justo lo que no se puede
+    /// hacer — puede invertir prioridades y cortar el audio. Un puntero capturado
+    /// por valor no toca ARC ni bloquea nada.
+    private let latencyBox: UnsafeMutablePointer<Double>
+
     public init(preferredBufferFrames: UInt32? = nil) {
         self.preferredBufferFrames = preferredBufferFrames
         scratch = .allocate(capacity: maximumFrames * Limiter.maximumChannels)
         scratch.initialize(repeating: 0, count: maximumFrames * Limiter.maximumChannels)
+        latencyBox = .allocate(capacity: 1)
+        latencyBox.initialize(to: 0)
     }
 
     deinit {
         stop()
         scratch.deinitialize(count: maximumFrames * Limiter.maximumChannels)
         scratch.deallocate()
+        latencyBox.deinitialize(count: 1)
+        latencyBox.deallocate()
     }
 
     public func start() throws {
@@ -130,13 +142,17 @@ public final class BoostEngine {
     }
 
     private func installIOProc(on aggregate: AggregateDevice) throws {
+        // Todo lo que el callback usa se captura por valor acá: referencias fuertes
+        // que el bloque retiene una sola vez, y punteros crudos. Nada que obligue a
+        // tocar ARC o a tomar un lock por cada vuelta.
         let processor = self.processor
         let scratch = self.scratch
+        let latencyBox = self.latencyBox
         let maximumFrames = self.maximumFrames
         let maximumChannels = Limiter.maximumChannels
 
         try check(AudioDeviceCreateIOProcIDWithBlock(&ioProcID, aggregate.objectID, nil) {
-            [weak self] _, inputData, inputTime, outputData, outputTime in
+            _, inputData, inputTime, outputData, outputTime in
 
             let output = UnsafeMutableAudioBufferListPointer(outputData)
 
@@ -173,7 +189,7 @@ public final class BoostEngine {
             else { return }
             frames = min(frames, maximumFrames)
 
-            self?.recordLatency(input: inputTime, output: outputTime)
+            BoostEngine.recordLatency(input: inputTime, output: outputTime, into: latencyBox)
 
             if input.count == 1, output.count == 1, inputChannels == outputChannels {
                 // El caso común: un solo buffer intercalado en cada punta.
@@ -227,8 +243,11 @@ public final class BoostEngine {
 
     /// La distancia entre "este audio se capturó" y "este audio se va a escuchar",
     /// directo de los timestamps que CoreAudio le pasa al callback.
-    private func recordLatency(input: UnsafePointer<AudioTimeStamp>,
-                               output: UnsafePointer<AudioTimeStamp>) {
+    ///
+    /// Estática y sin tocar `self` a propósito: se llama desde el hilo de audio.
+    private static func recordLatency(input: UnsafePointer<AudioTimeStamp>,
+                                      output: UnsafePointer<AudioTimeStamp>,
+                                      into box: UnsafeMutablePointer<Double>) {
         let inputStamp = input.pointee
         let outputStamp = output.pointee
         guard inputStamp.mFlags.contains(.hostTimeValid),
@@ -236,7 +255,7 @@ public final class BoostEngine {
         let inputNanos = AudioConvertHostTimeToNanos(inputStamp.mHostTime)
         let outputNanos = AudioConvertHostTimeToNanos(outputStamp.mHostTime)
         guard outputNanos > inputNanos else { return }
-        measuredIOLatencySeconds = Double(outputNanos - inputNanos) / 1_000_000_000
+        box.pointee = Double(outputNanos - inputNanos) / 1_000_000_000
     }
 
     public func stop() {
