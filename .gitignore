@@ -1,0 +1,6 @@
+.build/
+.swiftpm/
+*.o
+*.dSYM/
+Audio Booster.app/
+.DS_Store
