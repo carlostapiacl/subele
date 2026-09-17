@@ -144,7 +144,12 @@ correrlo en la máquina que lo compiló; distribuirlo pediría un certificado
 Developer ID y notarización.
 
 El ícono se genera por código en `Tools/make-icon.swift`, así que se revisa en
-diff como cualquier otro archivo en vez de ser un binario opaco.
+diff como cualquier otro archivo en vez de ser un binario opaco. Dibuja un dial
+que pasa del máximo —arco blanco hasta el tope, ámbar siguiendo más allá— con un
+parlante al centro. El ámbar es el mismo color que usa el medidor cuando el
+limitador trabaja. El de la barra de menú repite la idea en monocromo, y **el arco
+crece con la ganancia**: dice cuánto está amplificando sin que haya que leer el
+porcentaje.
 
 ## Uso
 

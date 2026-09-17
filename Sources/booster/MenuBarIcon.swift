@@ -1,66 +1,75 @@
 import AppKit
 
-/// El ícono de la barra de menú, dibujado a mano con el mismo lenguaje que el del
-/// bundle: forma de onda centrada que crece, y dos líneas de techo que las barras
-/// más altas tocan pero no cruzan.
+/// El ícono de la barra de menú: la misma idea que el del bundle —un dial con un
+/// parlante adentro— simplificada para 18 puntos.
 ///
 /// No es un SF Symbol a propósito. Un parlante genérico se confunde con el control
-/// de volumen del sistema y con cualquier otra app de audio; esto se reconoce.
+/// de volumen del sistema y con cualquier otra app de audio de la barra.
 ///
-/// Se dibuja en vez de venir de un archivo para que macOS lo pida en la escala que
-/// necesite, y va como template: el sistema lo tiñe solo en claro y en oscuro.
+/// En monocromo no existe el ámbar que en el ícono grande separa el rango normal
+/// de lo que está por encima, así que el límite lo marca un corte en el arco. Y el
+/// arco **crece con la ganancia**: el ícono mismo dice cuánto está amplificando,
+/// sin depender de leer el porcentaje de al lado.
+///
+/// Va como template: macOS lo tiñe solo en claro, en oscuro y con el menú abierto.
 enum MenuBarIcon {
 
-    private static let size = NSSize(width: 19, height: 15)
+    private static let size = NSSize(width: 18, height: 16)
 
-    /// Alturas relativas al techo. Las que pasan de 1 quedan recortadas planas,
-    /// que es lo que cuenta el dibujo. Son menos barras que en el ícono grande
-    /// porque a 19 puntos de ancho más se convierten en una mancha.
-    private static let normalBars: [CGFloat] = [0.24, 0.44, 0.32, 0.68, 1.05, 1.15]
-    /// Con ganancia arriba de 100% la onda crece: el ícono mismo dice que está
-    /// amplificando, sin depender de leer el porcentaje de al lado.
-    private static let boostedBars: [CGFloat] = [0.42, 0.72, 0.55, 1.10, 1.20, 1.15]
+    private static let startDegrees: CGFloat = 208
+    private static let endDegrees: CGFloat = -28
+    /// Dónde termina el rango normal, como fracción del recorrido.
+    private static let maximumFraction: CGFloat = 0.72
 
     static func image(boosted: Bool) -> NSImage {
-        let fractions = boosted ? boostedBars : normalBars
         let image = NSImage(size: size, flipped: false) { rect in
-            draw(fractions: fractions, in: rect)
+            draw(in: rect, boosted: boosted)
             return true
         }
-        image.isTemplate = true          // que macOS decida el color
+        image.isTemplate = true
         return image
     }
 
-    private static func draw(fractions: [CGFloat], in rect: NSRect) {
+    private static func draw(in rect: NSRect, boosted: Bool) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
         NSColor.black.setFill()
 
-        let lineThickness: CGFloat = 1
-        let midY = rect.midY
-        let maxHalf = rect.height / 2 - lineThickness - 0.5
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = rect.width * 0.425
+        let width = rect.width * 0.078
+        let start = startDegrees * .pi / 180
+        let end = endDegrees * .pi / 180
+        let maximum = start + (end - start) * maximumFraction
+        // Un corte proporcional al trazo: más chico no se ve, más grande parte el
+        // arco en dos cosas distintas.
+        let gap = (end - start) * 0.10
 
-        // Barras centradas en el eje, repartidas con huecos del 60%. El margen
-        // lateral evita que la primera y la última queden pegadas al borde, que a
-        // este tamaño se ve como si estuvieran cortadas.
-        let sideMargin = rect.width * 0.03
-        let usableWidth = rect.width - sideMargin * 2
-        let count = CGFloat(fractions.count)
-        let barWidth = usableWidth / (count + 0.6 * (count - 1))
-        let gap = barWidth * 0.6
-        let radius = barWidth * 0.35
+        context.setLineCap(.round)
+        context.setLineWidth(width)
+        context.setStrokeColor(NSColor.black.cgColor)
 
-        for (index, fraction) in fractions.enumerated() {
-            let half = min(maxHalf * fraction, maxHalf)
-            let bar = NSRect(x: rect.minX + sideMargin + CGFloat(index) * (barWidth + gap),
-                             y: midY - half,
-                             width: barWidth,
-                             height: half * 2)
-            NSBezierPath(roundedRect: bar, xRadius: radius, yRadius: radius).fill()
+        context.addArc(center: center, radius: radius,
+                       startAngle: start, endAngle: maximum, clockwise: true)
+        context.strokePath()
+
+        // El tramo de más allá del máximo solo aparece cuando hay boost.
+        if boosted {
+            context.addArc(center: center, radius: radius,
+                           startAngle: maximum + gap, endAngle: end, clockwise: true)
+            context.strokePath()
         }
 
-        // Techos arriba y abajo.
-        NSBezierPath(rect: NSRect(x: rect.minX, y: midY + maxHalf,
-                                  width: rect.width, height: lineThickness)).fill()
-        NSBezierPath(rect: NSRect(x: rect.minX, y: midY - maxHalf - lineThickness,
-                                  width: rect.width, height: lineThickness)).fill()
+        // Parlante al centro.
+        let unit = rect.width
+        let origin = CGPoint(x: center.x - unit * 0.045, y: center.y)
+        let body = NSBezierPath()
+        body.move(to: CGPoint(x: origin.x - unit * 0.150, y: origin.y - unit * 0.062))
+        body.line(to: CGPoint(x: origin.x - unit * 0.052, y: origin.y - unit * 0.062))
+        body.line(to: CGPoint(x: origin.x + unit * 0.076, y: origin.y - unit * 0.185))
+        body.line(to: CGPoint(x: origin.x + unit * 0.076, y: origin.y + unit * 0.185))
+        body.line(to: CGPoint(x: origin.x - unit * 0.052, y: origin.y + unit * 0.062))
+        body.line(to: CGPoint(x: origin.x - unit * 0.150, y: origin.y + unit * 0.062))
+        body.close()
+        body.fill()
     }
 }

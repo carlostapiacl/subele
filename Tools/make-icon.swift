@@ -3,12 +3,13 @@
 //  Genera AppIcon.icns por código, para que el ícono sea reproducible y revisable
 //  en diff como cualquier otro archivo del repo.
 //
-//  El dibujo cuenta lo que hace la app: una forma de onda que crece de izquierda a
-//  derecha, y dos líneas de techo —arriba y abajo— que las barras más altas tocan
-//  pero no cruzan. Eso es exactamente el limitador.
+//  El dibujo dice las dos cosas que la app es: un dial que pasa del máximo —arco
+//  blanco hasta el tope, ámbar siguiendo más allá— y un parlante al centro. Sin el
+//  parlante el dial podría ser de batería, velocidad o carga; sin el dial sería un
+//  ícono de audio más.
 //
-//  Simétrica alrededor del centro a propósito: unas barras apoyadas en el piso se
-//  leen como un gráfico de estadísticas, no como audio.
+//  El ámbar no es decorativo: es el mismo color que usa el medidor de la app
+//  cuando el limitador está trabajando.
 //
 //  Uso:  swift Tools/make-icon.swift
 //
@@ -18,24 +19,21 @@ import Foundation
 
 let squircleInsetRatio: CGFloat = 0.086      // margen que macOS espera alrededor
 let cornerRatio: CGFloat = 0.2237            // proporción de esquina estilo Big Sur
-/// Alturas relativas al techo. Suben pero no en línea recta, para que se lea como
-/// audio y no como una rampa. Las que pasan de 1 quedan recortadas planas contra
-/// el techo y se pintan ámbar, y van juntas al final a propósito: intercaladas se
-/// leían como un patrón arbitrario en vez de "creció hasta que chocó con el
-/// límite", que es lo que el dibujo tiene que contar.
-let barFractions: [CGFloat] = [0.16, 0.30, 0.22, 0.46, 0.36, 0.62, 0.82, 1.05, 1.18, 1.10]
 
-func color(_ red: CGFloat, _ green: CGFloat, _ blue: CGFloat) -> CGColor {
-    NSColor(srgbRed: red / 255, green: green / 255, blue: blue / 255, alpha: 1).cgColor
+/// Recorrido del dial. Hasta `maximumFraction` es blanco —el rango normal—, y de
+/// ahí al final es ámbar: eso es lo que la app agrega por sobre el 100%.
+let arcStartDegrees: CGFloat = 212
+let arcEndDegrees: CGFloat = -32
+let maximumFraction: CGFloat = 0.72
+
+func color(_ red: CGFloat, _ green: CGFloat, _ blue: CGFloat, _ alpha: CGFloat = 1) -> CGColor {
+    NSColor(srgbRed: red / 255, green: green / 255, blue: blue / 255, alpha: alpha).cgColor
 }
 
 let gradientTop = color(108, 122, 255)
 let gradientBottom = color(26, 22, 66)
-/// Ámbar para lo que está tocando el techo: el mismo código de color que usa el
-/// medidor de la app cuando el limitador trabaja. El bicolor no es decorativo —
-/// dice cuáles barras están siendo limitadas.
-let limitedColor = color(255, 176, 32)
-let freeColor = NSColor.white.cgColor
+let beyondMaximum = color(255, 176, 32)
+let withinRange = NSColor.white.cgColor
 
 func renderPNG(size: Int) -> Data {
     let side = CGFloat(size)
@@ -57,10 +55,11 @@ func renderPNG(size: Int) -> Data {
     let inset = side * squircleInsetRatio
     let plate = CGRect(x: inset, y: inset, width: side - inset * 2, height: side - inset * 2)
     let radius = plate.width * cornerRatio
-    let plateShape = CGPath(roundedRect: plate, cornerWidth: radius,
-                            cornerHeight: radius, transform: nil)
+    let shape = CGPath(roundedRect: plate, cornerWidth: radius,
+                       cornerHeight: radius, transform: nil)
+
     context.saveGState()
-    context.addPath(plateShape)
+    context.addPath(shape)
     context.clip()
     if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
                                  colors: [gradientTop, gradientBottom] as CFArray,
@@ -71,18 +70,18 @@ func renderPNG(size: Int) -> Data {
             end: CGPoint(x: plate.midX, y: plate.minY),
             options: [])
     }
+    context.restoreGState()
 
     // Brillo especular en el borde de arriba. Es el detalle que separa un
     // rectángulo pintado de algo que parece un ícono de macOS: la luz entra desde
     // arriba y el borde superior la devuelve.
     context.saveGState()
-    context.addPath(plateShape)
-    context.setLineWidth(side * 0.006)
-    context.setStrokeColor(NSColor.white.withAlphaComponent(0.28).cgColor)
+    context.addPath(shape)
+    context.setLineWidth(side * 0.007)
     context.replacePathWithStrokedPath()
     context.clip()
     if let sheen = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                              colors: [NSColor.white.withAlphaComponent(0.55).cgColor,
+                              colors: [NSColor.white.withAlphaComponent(0.6).cgColor,
                                        NSColor.white.withAlphaComponent(0).cgColor] as CFArray,
                               locations: [0, 1]) {
         context.drawLinearGradient(
@@ -93,46 +92,56 @@ func renderPNG(size: Int) -> Data {
     }
     context.restoreGState()
 
-    // Zona de contenido.
-    let padding = plate.width * 0.17
-    let content = plate.insetBy(dx: padding, dy: padding)
-    let midY = content.midY
+    context.saveGState()
+    context.addPath(shape)
+    context.clip()
 
-    // Techos simétricos, uno arriba y otro abajo.
-    let ceilingThickness = max(1, content.height * 0.028)
-    let halfHeight = content.height / 2 - ceilingThickness * 1.4
+    // Sombra suave, para que el dibujo despegue del fondo.
+    context.setShadow(offset: CGSize(width: 0, height: -side * 0.007),
+                      blur: side * 0.016,
+                      color: NSColor.black.withAlphaComponent(0.3).cgColor)
 
-    // Barras centradas en el eje: es lo que hace que se lea como audio.
-    // El ancho sale de repartir el contenido entre barras y huecos del 62%.
-    let barCount = barFractions.count
-    let barWidth = content.width / (CGFloat(barCount) + 0.62 * CGFloat(barCount - 1))
-    let gap = barWidth * 0.62
-    let barRadius = barWidth * 0.34
+    // El dial.
+    let center = CGPoint(x: plate.midX, y: plate.midY - plate.height * 0.03)
+    let arcRadius = plate.width * 0.325
+    let arcWidth = plate.width * 0.095
+    let start = arcStartDegrees * .pi / 180
+    let end = arcEndDegrees * .pi / 180
+    let maximum = start + (end - start) * maximumFraction
 
-    // Sombra suave debajo de la onda, para que despegue del fondo.
-    context.setShadow(offset: CGSize(width: 0, height: -side * 0.008),
-                      blur: side * 0.018,
-                      color: NSColor.black.withAlphaComponent(0.35).cgColor)
+    context.setLineCap(.round)
+    context.setLineWidth(arcWidth)
+    context.setStrokeColor(withinRange)
+    context.addArc(center: center, radius: arcRadius,
+                   startAngle: start, endAngle: maximum, clockwise: true)
+    context.strokePath()
+    context.setStrokeColor(beyondMaximum)
+    context.addArc(center: center, radius: arcRadius,
+                   startAngle: maximum, endAngle: end, clockwise: true)
+    context.strokePath()
 
-    for (index, fraction) in barFractions.enumerated() {
-        let limited = fraction >= 1
-        let half = min(halfHeight * fraction, halfHeight)
-        let bar = CGRect(x: content.minX + CGFloat(index) * (barWidth + gap),
-                         y: midY - half,
-                         width: barWidth,
-                         height: half * 2)
-        context.setFillColor(limited ? limitedColor : freeColor)
-        context.addPath(CGPath(roundedRect: bar, cornerWidth: barRadius,
-                               cornerHeight: barRadius, transform: nil))
-        context.fillPath()
-    }
+    // El parlante. Generoso a propósito: a 32 px el dial se vuelve un anillo fino
+    // y esto es lo único que sigue diciendo de qué se trata.
+    let unit = plate.width
+    let origin = CGPoint(x: center.x - unit * 0.045, y: center.y)
+    let body = CGMutablePath()
+    body.move(to: CGPoint(x: origin.x - unit * 0.130, y: origin.y - unit * 0.048))
+    body.addLine(to: CGPoint(x: origin.x - unit * 0.046, y: origin.y - unit * 0.048))
+    body.addLine(to: CGPoint(x: origin.x + unit * 0.062, y: origin.y - unit * 0.145))
+    body.addLine(to: CGPoint(x: origin.x + unit * 0.062, y: origin.y + unit * 0.145))
+    body.addLine(to: CGPoint(x: origin.x - unit * 0.046, y: origin.y + unit * 0.048))
+    body.addLine(to: CGPoint(x: origin.x - unit * 0.130, y: origin.y + unit * 0.048))
+    body.closeSubpath()
+    context.setFillColor(withinRange)
+    context.addPath(body)
+    context.fillPath()
 
-    context.setShadow(offset: .zero, blur: 0, color: nil)
-    context.setFillColor(limitedColor)
-    context.fill(CGRect(x: content.minX, y: midY + halfHeight,
-                        width: content.width, height: ceilingThickness))
-    context.fill(CGRect(x: content.minX, y: midY - halfHeight - ceilingThickness,
-                        width: content.width, height: ceilingThickness))
+    context.setLineWidth(unit * 0.040)
+    context.setStrokeColor(withinRange)
+    context.addArc(center: CGPoint(x: origin.x + unit * 0.062, y: origin.y),
+                   radius: unit * 0.105,
+                   startAngle: -52 * .pi / 180, endAngle: 52 * .pi / 180, clockwise: false)
+    context.strokePath()
 
     context.restoreGState()
 
