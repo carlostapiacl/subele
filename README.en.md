@@ -1,6 +1,6 @@
 # audio-booster
 
-[![test](https://github.com/carlostapiacl/subele/actions/workflows/test.yml/badge.svg)](https://github.com/carlostapiacl/subele/actions/workflows/test.yml)
+[![test](https://github.com/carlostapiacl/audio-booster/actions/workflows/test.yml/badge.svg)](https://github.com/carlostapiacl/audio-booster/actions/workflows/test.yml)
 [![license](https://img.shields.io/badge/license-MIT-222)](LICENSE)
 [![macOS](https://img.shields.io/badge/macOS-14.2%2B-222)](#requirements)
 [![no dependencies](https://img.shields.io/badge/dependencies-0-222)](Package.swift)
@@ -133,7 +133,7 @@ this project is built without Xcode.
 
 ### Download
 
-Grab the `.dmg` from the [latest release](https://github.com/carlostapiacl/subele/releases/latest),
+Grab the `.dmg` from the [latest release](https://github.com/carlostapiacl/audio-booster/releases/latest),
 open it and drag **Audio Booster** to Applications.
 
 **macOS will block it the first time.** The app is ad-hoc signed but **not
@@ -156,7 +156,7 @@ through System Settings.
 If you would rather not trust an un-notarised binary — fair — it takes seconds:
 
 ```bash
-git clone https://github.com/carlostapiacl/subele
+git clone https://github.com/carlostapiacl/audio-booster
 cd audio-booster
 ./build-app.sh
 open "Audio Booster.app"
