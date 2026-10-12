@@ -16,7 +16,7 @@ public final class AggregateDevice {
     public init(tapUUID: UUID, outputDeviceUID: String, name: String = "Subele") throws {
         let description: [String: Any] = [
             kAudioAggregateDeviceNameKey: name,
-            kAudioAggregateDeviceUIDKey: "cl.carlostapia.audio-booster.\(UUID().uuidString)",
+            kAudioAggregateDeviceUIDKey: "cl.carlostapia.subele.\(UUID().uuidString)",
             kAudioAggregateDeviceMainSubDeviceKey: outputDeviceUID,
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceIsStackedKey: false,

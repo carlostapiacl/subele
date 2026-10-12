@@ -17,6 +17,8 @@ de salida por defecto nunca queda secuestrado.
 Es gratis y de código abierto. Si te sirve, [se agradece una donación](https://paypal.me/carlostapiacl);
 si no, usala igual. *(Antes se llamaba audio-booster.)*
 
+<p align="center"><img src="docs/screenshot-ecualizador.png" width="640" alt="El menú de Subele con el ecualizador gráfico abierto"></p>
+
 ---
 
 ## Por qué existe
@@ -51,7 +53,9 @@ ve el pico antes de que llegue no tiene que cortar nada.
 procesos del sistema ──┐
                        ├──→ [ process tap ] ──→ IOProc ──→ ganancia
                        │      silenciado                       ↓
-                       │      al tapearse        compresor + makeup   (modo loudness)
+                       │      al tapearse                 ecualizador
+                       │                                       ↓
+                       │                         compresor + makeup   (modo Voz)
                        │                                       ↓
                        │                    limitador brickwall, 3 ms de lookahead
                        │                                       ↓
@@ -221,11 +225,13 @@ El ícono se genera por código en `Tools/make-icon.swift`, así que se revisa e
 diff como cualquier otro archivo en vez de ser un binario opaco. Dibuja un dial
 que pasa del máximo —arco blanco hasta el tope, ámbar siguiendo más allá— con un
 parlante al centro. El ámbar es el mismo color que usa el medidor cuando el
-limitador trabaja. El de la barra de menú repite la idea en monocromo, y **el arco
-crece con la ganancia**: dice cuánto está amplificando sin que haya que leer el
-porcentaje.
+limitador trabaja. El de la barra de menú repite la idea en monocromo: **el arco
+sigue más allá del tope solo cuando la ganancia pasa de 100%**, así se sabe de un
+vistazo si está amplificando. El porcentaje aparece al lado.
 
 ## Uso
+
+<p align="center"><img src="docs/screenshot-menu.png" width="300" alt="El menú de Subele"></p>
 
 Aparece un ícono de parlante en la barra de menú. Al abrirlo: el dispositivo de
 salida y su formato, un medidor de nivel que se pone naranja mientras el limitador
@@ -268,8 +274,9 @@ de mediciones por música de fondo antes de que los tests se fueran del hardware
 Lo que dejan clavado: ganancia exacta mientras haya headroom, el limitador
 llegando al techo pero nunca pasándolo, transitorios de silencio a fondo de
 escala, salida idéntica bit a bit entre bloques de 32 y de 1024, el ecualizador
-plano sin tocar un bit y cada banda subiendo lo que dice, todos los conteos
-de canales de mono a 7.1, y NaN o infinito llegando a la entrada sin matar la
+plano sin tocar un bit y cada banda subiendo lo que dice, conteos de canales
+de mono a 7.1 (1, 2, 4, 6 y 8), la curva dibujada coincidiendo con un seno filtrado
+de verdad, el analizador de espectro ubicando un tono, y NaN o infinito llegando a la entrada sin matar la
 cadena.
 
 ## Limitaciones conocidas
@@ -291,6 +298,8 @@ cadena.
 ```
 Sources/CAtomics/            cargas y guardas atómicas para los parámetros
 Sources/BoosterKit/          la parte reutilizable, sin AppKit
+  Booster.swift              la versión, única fuente de verdad
+  Atomics.swift              Float y UInt32 atómicos sobre CAtomics
   CoreAudio/
     AudioObject.swift        envoltorio tipado de la API de propiedades, errores, traza
     AudioDevices.swift       consultas de dispositivos y observación de la salida
@@ -311,6 +320,7 @@ Sources/subele/              el ejecutable
   main.swift                 elige el modo según los argumentos
   EqualizerView.swift        el ecualizador gráfico
   MenuBarApp.swift           frente en AppKit
+  MenuBarIcon.swift          ícono de la barra, dibujado por código
   LevelMeterView.swift
   ConsoleMode.swift
   Strings.swift              todo el texto visible, tipado, en dos idiomas
