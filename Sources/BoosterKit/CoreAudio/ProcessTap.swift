@@ -26,7 +26,7 @@ public final class ProcessTap {
             __excludingProcesses: processes.map { NSNumber(value: $0) },
             andDeviceUID: deviceUID,
             withStream: stream)
-        description.name = "Audio Booster"
+        description.name = "Subele"
         description.isPrivate = true
         description.muteBehavior = .mutedWhenTapped
 

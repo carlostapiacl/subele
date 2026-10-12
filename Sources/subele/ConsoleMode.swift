@@ -32,7 +32,7 @@ enum ConsoleMode {
             exit(1)
         }
 
-        engine.onDefaultOutputChanged = {
+        engine.onOutputChanged = {
             print("  \(strings.deviceChanged)")
             engine.stop()
             do {
@@ -60,11 +60,11 @@ enum ConsoleMode {
         case "q", "quit", "exit", "salir":
             DispatchQueue.main.async { engine.stop(); exit(0) }
 
-        case "t":
+        case "m", "t":   // t y l, de cuando los modos se llamaban transparente y loudness
             engine.processor.mode = .transparent
             print("  \(strings.modeSetTransparent)")
 
-        case "l":
+        case "v", "l":
             engine.processor.mode = .loudness
             print("  \(strings.modeSetLoudness)")
 
@@ -91,17 +91,21 @@ enum ConsoleMode {
         let info = engine.info
         print("""
 
-          Audio Booster \(Booster.version) — \(strings.consoleHeader)
+          Subele \(Booster.version) — \(strings.consoleHeader)
           ─────────────────────────────────────────────
           \(strings.outputLabel):   \(info?.deviceName ?? "?")
           \(strings.formatLabel):   \(Int(info?.sampleRate ?? 0)) Hz · \
         \(info?.inputChannels ?? 0) → \(info?.outputChannels ?? 0) · \
         \(info?.bufferFrames ?? 0) \(strings.framesPerCallback)
           \(strings.gainLabel):     \(percent(engine.processor.gain))%   \
-        \(strings.modeLabel): \(engine.processor.mode.rawValue)
+        \(strings.modeLabel): \(modeName(engine.processor.mode))
 
         \(strings.commandsHelp)
         """)
+    }
+
+    private static func modeName(_ mode: BoostMode) -> String {
+        (mode == .loudness ? strings.loudness : strings.transparent).lowercased()
     }
 
     private static func percent(_ gain: Float) -> Int { Int((gain * 100).rounded()) }
@@ -109,7 +113,7 @@ enum ConsoleMode {
     private static func status(_ engine: BoostEngine) -> String {
         String(format: "  %d%% · %@ · comp %.1f dB · lim %.1f dB · peak %.1f dBFS",
                percent(engine.processor.gain),
-               engine.processor.mode.rawValue,
+               modeName(engine.processor.mode),
                engine.processor.compressorReductionDecibels,
                engine.processor.limiterReductionDecibels,
                linearToDecibels(engine.processor.outputPeak))

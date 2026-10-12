@@ -1,5 +1,5 @@
 #!/bin/bash
-# Empaqueta "Audio Booster.app" en un .dmg listo para descargar: la app y un
+# Empaqueta "Subele.app" en un .dmg listo para descargar: la app y un
 # atajo a Aplicaciones, que es el gesto que la gente ya conoce.
 #
 # Ojo con lo que esto NO hace: el .dmg va firmado ad-hoc y sin notarizar, porque
@@ -8,9 +8,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-APP="Audio Booster.app"
+APP="Subele.app"
 VERSION=$(sed -n 's/.*let version = "\(.*\)"/\1/p' Sources/BoosterKit/Booster.swift)
-DMG="dist/audio-booster-${VERSION}.dmg"
+DMG="dist/subele-${VERSION}.dmg"
 
 [ -d "$APP" ] || { echo "No existe $APP — corré ./build-app.sh primero" >&2; exit 1; }
 
@@ -24,7 +24,7 @@ ln -s /Applications "$STAGE/Aplicaciones"
 
 echo "▸ Creando ${DMG}…"
 hdiutil create \
-    -volname "Audio Booster" \
+    -volname "Subele" \
     -srcfolder "$STAGE" \
     -ov -format UDZO \
     "$DMG" >/dev/null

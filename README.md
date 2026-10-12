@@ -1,6 +1,6 @@
-# audio-booster
+# Subele
 
-[![test](https://github.com/carlostapiacl/audio-booster/actions/workflows/test.yml/badge.svg)](https://github.com/carlostapiacl/audio-booster/actions/workflows/test.yml)
+[![test](https://github.com/carlostapiacl/subele/actions/workflows/test.yml/badge.svg)](https://github.com/carlostapiacl/subele/actions/workflows/test.yml)
 [![license](https://img.shields.io/badge/license-MIT-222)](LICENSE)
 [![macOS](https://img.shields.io/badge/macOS-14.2%2B-222)](#requisitos)
 [![sin dependencias](https://img.shields.io/badge/dependencias-0-222)](Package.swift)
@@ -13,6 +13,9 @@ reventado.**
 Una app de barra de menú. Movés el slider, el sistema suena más fuerte. Lo raro
 está abajo: ninguna extensión de kernel, ningún driver de audio, y tu dispositivo
 de salida por defecto nunca queda secuestrado.
+
+Es gratis y de código abierto. Si te sirve, [se agradece una donación](https://paypal.me/carlostapiacl);
+si no, usala igual. *(Antes se llamaba audio-booster.)*
 
 ---
 
@@ -29,7 +32,7 @@ que Apple saca una actualización.
 API pública que captura lo que otros procesos están reproduciendo, sin driver de
 por medio. Este proyecto está construido sobre eso.
 
-|  | boosters con driver | audio-booster |
+|  | boosters con driver | Subele |
 | --- | --- | --- |
 | Instala driver | sí, con `sudo` | no |
 | Toma la salida por defecto | sí | **no** |
@@ -91,15 +94,47 @@ de ganancia aterriza en el techo, no lo atraviesa.
 
 ## Modos
 
-- **Transparente** — solo ganancia y limitación. Dinámica intacta: lo que sonaba
-  fuerte respecto de lo que sonaba bajo sigue igual. Para música.
-- **Loudness** — agrega compresión con makeup automático, que sube lo bajo en vez
-  de aplastar lo alto. Para voz, llamadas y video con audio flojo.
+- **Música** — solo ganancia y limitación. Dinámica intacta: lo que sonaba
+  fuerte respecto de lo que sonaba bajo sigue igual. **Con la ganancia en 100% no
+  hace nada, a propósito**: se nota al subir, cuando el limitador empieza a
+  trabajar. El panel lo dice debajo del selector, porque fue lo primero que
+  preguntó alguien que la probó.
+- **Voz** — agrega compresión con makeup automático, que sube lo bajo en vez de
+  aplastar lo alto. Para voz, llamadas y video con audio flojo. Este sí se nota
+  en 100%.
+
+(En versiones anteriores se llamaban *Transparente* y *Loudness*.)
 
 El makeup no es un detalle, es la razón misma de poner un compresor ahí. Un
 compresor sin makeup hace el audio *más bajo*. La primera versión de este DSP
 salió con ese error y medía más bajo a 300% de ganancia que a 100%. También hay un
 test que lo deja clavado.
+
+## Ecualizador
+
+Cinco bandas, ±12 dB: un shelf de graves en 60 Hz, campanas en 250 Hz, 1 kHz y
+4 kHz, y un shelf de agudos en 12 kHz. Son biquads del cookbook de Robert
+Bristow-Johnson con estado en doble precisión, y van **antes** del compresor y del
+limitador: subir los graves agrega energía, y puesto ahí el limitador ve ese pico
+como cualquier otro en vez de dejarlo clipear.
+
+Con todas las bandas en 0 dB la salida es idéntica bit a bit a la entrada. Hay un
+test para eso, otro que comprueba que cada banda sube lo que dice y otro que lo
+pone todo a +12 dB en cinco frecuencias de muestreo para ver que nada se vuelva
+inestable.
+
+## Frecuencia de muestreo
+
+El menú **Frecuencia de muestreo** cambia la salida entre las frecuencias que
+acepte el dispositivo (44,1, 48, 96 kHz…), lo mismo que hacerlo en Configuración
+de Audio MIDI, pero sin saber que esa app existe. El cambio es para todo el
+sistema, y la cadena se rehace sola cuando el dispositivo lo termina de aplicar,
+también si se cambia desde afuera.
+
+Lo que gana y lo que no: subir de 44,1 a 96 kHz no le agrega detalle a una
+grabación de 44,1. Lo que puede cambiar es que macOS deje de convertir de
+frecuencia y que la interfaz suene distinto a la frecuencia que prefiere. Hay
+gente que lo nota mucho, y antes había que ir a buscarlo a una app escondida.
 
 ## Latencia
 
@@ -134,8 +169,10 @@ Tools de Xcode alcanzan: este proyecto se compila sin Xcode.
 
 ### Descargar
 
-Bajá el `.dmg` de la [última versión](https://github.com/carlostapiacl/audio-booster/releases/latest),
-abrilo y arrastrá **Audio Booster** a Aplicaciones.
+> Gratis. Si te sirve: [donar por PayPal](https://paypal.me/carlostapiacl).
+
+Bajá el `.dmg` de la [última versión](https://github.com/carlostapiacl/subele/releases/latest),
+abrilo y arrastrá **Subele** a Aplicaciones.
 
 **La primera vez macOS la va a bloquear.** La app está firmada ad-hoc pero **no
 notarizada**: notarizar exige una cuenta de Apple Developer de pago (USD 99 al
@@ -143,10 +180,10 @@ año). Vas a ver *"Apple no pudo verificar que esté libre de malware"*. Para
 destrabarla, una de estas dos:
 
 - **Ajustes del Sistema → Privacidad y seguridad**, bajá hasta el aviso sobre
-  Audio Booster y tocá **Abrir igualmente**.
+  Subele y tocá **Abrir igualmente**.
 - O en la Terminal:
   ```bash
-  xattr -d com.apple.quarantine "/Applications/Audio Booster.app"
+  xattr -d com.apple.quarantine "/Applications/Subele.app"
   ```
 
 En macOS 15 el viejo truco de Control-clic → Abrir ya no alcanza; hay que pasar
@@ -158,10 +195,10 @@ Si preferís no confiar en un binario sin notarizar —razonable—, son unos
 segundos:
 
 ```bash
-git clone https://github.com/carlostapiacl/audio-booster
-cd audio-booster
+git clone https://github.com/carlostapiacl/subele
+cd subele
 ./build-app.sh
-open "Audio Booster.app"
+open "Subele.app"
 ```
 
 `build-app.sh` compila release, corre los tests, genera el ícono, arma el `.app` a
@@ -184,20 +221,27 @@ porcentaje.
 
 Aparece un ícono de parlante en la barra de menú. Al abrirlo: el dispositivo de
 salida y su formato, un medidor de nivel que se pone naranja mientras el limitador
-trabaja, un slider de 50 a 400%, el selector de modo, la latencia y el idioma.
+trabaja, un slider de 50 a 400%, el selector de modo con lo que hace cada uno, y los menús
+de latencia, frecuencia de muestreo, ecualizador e idioma.
 
-La ganancia, el modo, la latencia y el idioma se guardan entre sesiones.
+La ganancia, el modo, el ecualizador, la latencia y el idioma se guardan entre
+sesiones. La frecuencia de muestreo no la guarda la app: es del dispositivo, y
+macOS ya la recuerda.
+
+Todo lo que cruza entre la interfaz y el hilo de audio —ganancia, modo, bandas
+del ecualizador y medidores— pasa por atómicos (`Sources/CAtomics`, porque el
+`Atomic` de Swift exige macOS 15).
 
 Un binario, dos caras — el bundle `.app` solo lo envuelve:
 
 ```bash
-booster              # app de barra de menú
-booster --cli        # consola interactiva
-booster --cli --buffer 128
-booster --help
+subele              # app de barra de menú
+subele --cli        # consola interactiva
+subele --cli --buffer 128
+subele --help
 ```
 
-`BOOSTER_TRACE=1` traza cada paso del arranque a stderr. Las llamadas a CoreAudio
+`SUBELE_TRACE=1` traza cada paso del arranque a stderr. Las llamadas a CoreAudio
 pueden bloquearse indefinidamente sin devolver error, y con stdout bufferizado un
 cuelgue así no deja ningún rastro.
 
@@ -215,7 +259,8 @@ de mediciones por música de fondo antes de que los tests se fueran del hardware
 
 Lo que dejan clavado: ganancia exacta mientras haya headroom, el limitador
 llegando al techo pero nunca pasándolo, transitorios de silencio a fondo de
-escala, salida idéntica bit a bit entre bloques de 32 y de 1024, todos los conteos
+escala, salida idéntica bit a bit entre bloques de 32 y de 1024, el ecualizador
+plano sin tocar un bit y cada banda subiendo lo que dice, todos los conteos
 de canales de mono a 7.1, y NaN o infinito llegando a la entrada sin matar la
 cadena.
 
@@ -225,12 +270,10 @@ cadena.
   dueño de la salida por defecto, así que tapeamos *su* dispositivo virtual, que a
   su vez está pasando audio. `AudioDeviceCreateIOProcIDWithBlock` entonces bloquea
   para siempre sin dar error. Hay que cerrarlo primero.
-- **Los parámetros se escriben sin sincronizar.** `gain` y `mode` los escribe el
-  hilo de la interfaz y los lee el hilo de audio. En x86-64 y arm64 una carga o
-  guarda alineada de 4 bytes es atómica en hardware, así que en la práctica no
-  pasa nada, pero formalmente es una carrera de datos. Arreglarlo bien pide
-  atómicos.
-- **El modo loudness sube el piso de ruido**, porque el makeup también se aplica
+- **AirPlay, sin confirmar.** Los parlantes AirPlay tienen su propio buffer de
+  unos dos segundos y no está probado que el dispositivo agregado los acepte como
+  salida (por confirmar). Un Bluetooth sí funciona.
+- **El modo Voz sube el piso de ruido**, porque el makeup también se aplica
   cuando no hay señal. Es inherente al modo, no un defecto.
 - **No arranca al iniciar sesión.** A propósito: no se instala un elemento de
   arranque sin que lo pidan.
@@ -238,6 +281,7 @@ cadena.
 ## Estructura
 
 ```
+Sources/CAtomics/            cargas y guardas atómicas para los parámetros
 Sources/BoosterKit/          la parte reutilizable, sin AppKit
   CoreAudio/
     AudioObject.swift        envoltorio tipado de la API de propiedades, errores, traza
@@ -247,11 +291,12 @@ Sources/BoosterKit/          la parte reutilizable, sin AppKit
   DSP/
     Decibels.swift           conversiones a dB y coeficientes de suavizado
     Compressor.swift         curva de rodilla suave y makeup automático
+    Equalizer.swift          5 biquads RBJ, coeficientes recalculados en el hilo de audio
     Limiter.swift            línea de retardo y mínimo deslizante
     BoostProcessor.swift     la cadena
   Engine/
     BoostEngine.swift        tap + agregado + IOProc + medición de latencia
-Sources/booster/             el ejecutable
+Sources/subele/              el ejecutable
   main.swift                 elige el modo según los argumentos
   MenuBarApp.swift           frente en AppKit
   LevelMeterView.swift
@@ -266,12 +311,7 @@ motor se puede embeber en otra cosa.
 
 ## Sitio
 
-[carlostapiacl.github.io/audio-booster](https://carlostapiacl.github.io/audio-booster/) — la página del proyecto, en `docs/`.
-
-## Apoyar
-
-Es gratis y va a seguir siéndolo. Si te resultó útil y querés colaborar:
-[PayPal](https://paypal.me/carlostapiacl). Y si no, usala igual.
+[carlostapiacl.github.io/subele](https://carlostapiacl.github.io/subele/) — la página del proyecto, en `docs/`.
 
 ## Licencia
 

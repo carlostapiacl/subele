@@ -13,7 +13,7 @@ public final class AggregateDevice {
 
     public let objectID: AudioDeviceID
 
-    public init(tapUUID: UUID, outputDeviceUID: String, name: String = "Audio Booster") throws {
+    public init(tapUUID: UUID, outputDeviceUID: String, name: String = "Subele") throws {
         let description: [String: Any] = [
             kAudioAggregateDeviceNameKey: name,
             kAudioAggregateDeviceUIDKey: "cl.carlostapia.audio-booster.\(UUID().uuidString)",

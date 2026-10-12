@@ -14,7 +14,7 @@ if arguments.contains("-h") || arguments.contains("--help") {
 }
 
 if arguments.contains("--version") {
-    print("audio-booster \(Booster.version)")
+    print("subele \(Booster.version)")
     exit(0)
 }
 
