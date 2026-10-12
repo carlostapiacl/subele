@@ -16,7 +16,7 @@ let package = Package(
         .target(
             name: "BoosterKit",
             dependencies: ["CAtomics"],
-            linkerSettings: [.linkedFramework("CoreAudio")]
+            linkerSettings: [.linkedFramework("CoreAudio"), .linkedFramework("Accelerate")]
         ),
         .executableTarget(
             name: "subele",

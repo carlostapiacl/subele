@@ -45,6 +45,8 @@ public final class BoostProcessor {
     public let equalizer = Equalizer()
     public let compressor = Compressor()
     public let limiter = Limiter()
+    /// Lo que sale, para el espectro del ecualizador. Apagado no cuesta nada.
+    public let spectrum = SpectrumTap()
 
     private var sampleRate: Double = 48_000
     private var channels = 2
@@ -110,6 +112,7 @@ public final class BoostProcessor {
         }
 
         limiter.process(buffer, frames: frames, channels: channels)
+        spectrum.write(buffer, frames: frames, channels: channels)
 
         publishedPeak.value = limiter.outputPeak
         publishedLimiterReduction.value = limiter.reductionDecibels

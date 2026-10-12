@@ -117,6 +117,13 @@ double-precision state, and they sit **before** the compressor and limiter:
 boosting bass adds energy, and placed there the limiter sees that peak like any
 other instead of letting it clip.
 
+It is driven as a graph: the real response curve — computed from the same
+biquads that process the audio, so what you see is what you hear — with one
+draggable point per band, double-click to reset it and the scroll wheel for fine
+adjustment. Behind it runs a spectrum of what is playing (4096-point FFT with
+Accelerate, on the UI thread and only while the equalizer is open). Presets give a
+starting point: Flat, More bass, Clear voice, Brighter, Night and Laptop speakers.
+
 With every band at 0 dB the output is bit-identical to the input. There is a test
 for that, one checking each band boosts by what it says, and one that pushes
 everything to +12 dB at five sample rates to make sure nothing goes unstable.
@@ -288,10 +295,14 @@ Sources/BoosterKit/          the reusable part, no AppKit
     Equalizer.swift          5 RBJ biquads, coefficients recomputed on the audio thread
     Limiter.swift            delay line and sliding-window minimum
     BoostProcessor.swift     the chain
+  Analysis/
+    SpectrumTap.swift        latest output samples, lock-free
+    SpectrumAnalyzer.swift   FFT into logarithmic bands
   Engine/
     BoostEngine.swift        tap + aggregate + IOProc + latency measurement
 Sources/subele/              the executable
   main.swift                 picks a mode from the arguments
+  EqualizerView.swift        the graphical equalizer
   MenuBarApp.swift           AppKit front end
   LevelMeterView.swift
   ConsoleMode.swift

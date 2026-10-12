@@ -118,6 +118,14 @@ Bristow-Johnson con estado en doble precisión, y van **antes** del compresor y 
 limitador: subir los graves agrega energía, y puesto ahí el limitador ve ese pico
 como cualquier otro en vez de dejarlo clipear.
 
+Se maneja como gráfico: la curva de respuesta real —calculada con los mismos
+biquads que procesan el audio, así que lo que se ve es lo que suena— con un punto
+por banda que se arrastra, doble clic para volverlo a cero y la rueda del mouse
+para ajuste fino. Detrás corre el espectro de lo que está sonando (FFT de 4096
+puntos con Accelerate, en el hilo de la interfaz y solo con el ecualizador
+abierto). Trae presets como punto de partida: Plano, Más graves, Voz clara, Más
+brillo, Noche y Parlantes de laptop.
+
 Con todas las bandas en 0 dB la salida es idéntica bit a bit a la entrada. Hay un
 test para eso, otro que comprueba que cada banda sube lo que dice y otro que lo
 pone todo a +12 dB en cinco frecuencias de muestreo para ver que nada se vuelva
@@ -294,10 +302,14 @@ Sources/BoosterKit/          la parte reutilizable, sin AppKit
     Equalizer.swift          5 biquads RBJ, coeficientes recalculados en el hilo de audio
     Limiter.swift            línea de retardo y mínimo deslizante
     BoostProcessor.swift     la cadena
+  Analysis/
+    SpectrumTap.swift        últimas muestras de la salida, sin locks
+    SpectrumAnalyzer.swift   FFT a bandas logarítmicas
   Engine/
     BoostEngine.swift        tap + agregado + IOProc + medición de latencia
 Sources/subele/              el ejecutable
   main.swift                 elige el modo según los argumentos
+  EqualizerView.swift        el ecualizador gráfico
   MenuBarApp.swift           frente en AppKit
   LevelMeterView.swift
   ConsoleMode.swift

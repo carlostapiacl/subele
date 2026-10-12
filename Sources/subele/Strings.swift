@@ -64,7 +64,13 @@ struct Strings {
     let sampleRateUnavailable: String
     let sampleRateFailed: String
     let equalizerMenu: String
-    let equalizerFlat: String
+    let equalizerHint: String
+    let presetFlat: String
+    let presetBass: String
+    let presetVoice: String
+    let presetBright: String
+    let presetNight: String
+    let presetLaptop: String
 
     // Panel
     let transparent: String
@@ -125,7 +131,13 @@ struct Strings {
         sampleRateUnavailable: "Not available for this device",
         sampleRateFailed: "Could not change it",
         equalizerMenu: "Equalizer",
-        equalizerFlat: "Flat",
+        equalizerHint: "Drag a point · double-click resets it",
+        presetFlat: "Flat",
+        presetBass: "More bass",
+        presetVoice: "Clear voice",
+        presetBright: "Brighter",
+        presetNight: "Night (quiet bass)",
+        presetLaptop: "Laptop speakers",
 
         transparent: "Music",
         loudness: "Voice",
@@ -204,7 +216,13 @@ struct Strings {
         sampleRateUnavailable: "No disponible en este dispositivo",
         sampleRateFailed: "No se pudo cambiar",
         equalizerMenu: "Ecualizador",
-        equalizerFlat: "Plano",
+        equalizerHint: "Arrastrá un punto · doble clic lo vuelve a cero",
+        presetFlat: "Plano",
+        presetBass: "Más graves",
+        presetVoice: "Voz clara",
+        presetBright: "Más brillo",
+        presetNight: "Noche (graves suaves)",
+        presetLaptop: "Parlantes de laptop",
 
         transparent: "Música",
         loudness: "Voz",
