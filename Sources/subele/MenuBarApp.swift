@@ -52,9 +52,22 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let meter = LevelMeterView()
     private let meterLabel = NSTextField(labelWithString: "")
     private let modeHintLabel = NSTextField(labelWithString: "")
-    private var equalizerSliders: [NSSlider] = []
-    private var equalizerValueLabels: [NSTextField] = []
+    private let equalizerView = EqualizerView(frame: NSRect(x: 0, y: 0, width: 380, height: 210))
+    private let analyzer = SpectrumAnalyzer()
     private var equalizerItem: NSMenuItem!
+    private var equalizerMenu: NSMenu!
+    private var presetItems: [NSMenuItem] = []
+
+    /// Puntos de partida, no recetas: después se ajustan arrastrando. Valores por
+    /// banda de 60 Hz a 12 kHz.
+    private static let presets: [(name: KeyPath<Strings, String>, gains: [Float])] = [
+        (\.presetFlat, [0, 0, 0, 0, 0]),
+        (\.presetBass, [6, 3, 0, 0, 1]),
+        (\.presetVoice, [-4, -1, 2, 4, 2]),
+        (\.presetBright, [0, -1, 0, 3, 6]),
+        (\.presetNight, [-6, -2, 2, 2, -2]),
+        (\.presetLaptop, [2, 4, 0, 1, 3]),
+    ]
     private var sampleRateMenu: NSMenu!
     private var sampleRateError: String?
     private var enabledItem: NSMenuItem!
@@ -164,12 +177,26 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(sampleRateItem)
 
         equalizerItem = NSMenuItem(title: strings.equalizerMenu, action: nil, keyEquivalent: "")
-        let equalizerMenu = NSMenu()
+        equalizerMenu = NSMenu()
+        equalizerMenu.delegate = self
+        equalizerMenu.autoenablesItems = false
         let equalizerPanel = NSMenuItem()
-        equalizerPanel.view = buildEqualizerPanel()
+        equalizerView.title = strings.equalizerHint
+        equalizerView.onChange = { [weak self] band, decibels in
+            self?.engine.processor.equalizer.setGain(decibels, ofBand: band)
+            self?.saveEqualizer()
+            self?.refreshChrome()
+        }
+        equalizerPanel.view = equalizerView
         equalizerMenu.addItem(equalizerPanel)
         equalizerMenu.addItem(.separator())
-        equalizerMenu.addItem(item(strings.equalizerFlat, #selector(flattenEqualizer)))
+        presetItems.removeAll()
+        for (index, preset) in Self.presets.enumerated() {
+            let entry = item(strings[keyPath: preset.name], #selector(presetChosen(_:)))
+            entry.tag = index
+            equalizerMenu.addItem(entry)
+            presetItems.append(entry)
+        }
         equalizerItem.submenu = equalizerMenu
         menu.addItem(equalizerItem)
 
@@ -269,51 +296,6 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return view
     }
 
-    private func buildEqualizerPanel() -> NSView {
-        equalizerSliders.removeAll()
-        equalizerValueLabels.removeAll()
-
-        let columnWidth: CGFloat = 44
-        let margin: CGFloat = 14
-        let width = margin * 2 + columnWidth * CGFloat(Equalizer.bandCount)
-        let view = FlippedView(frame: NSRect(x: 0, y: 0, width: width, height: 170))
-        let limit = Double(Equalizer.maximumGainDecibels)
-
-        for band in 0..<Equalizer.bandCount {
-            let x = margin + columnWidth * CGFloat(band)
-
-            let value = NSTextField(labelWithString: "")
-            value.frame = NSRect(x: x, y: 8, width: columnWidth, height: 14)
-            value.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular)
-            value.textColor = .secondaryLabelColor
-            value.alignment = .center
-            view.addSubview(value)
-            equalizerValueLabels.append(value)
-
-            let slider = NSSlider()
-            slider.isVertical = true
-            slider.frame = NSRect(x: x + (columnWidth - 22) / 2, y: 26, width: 22, height: 116)
-            slider.minValue = -limit
-            slider.maxValue = limit
-            slider.numberOfTickMarks = 3          // −12, 0, +12
-            slider.isContinuous = true
-            slider.tag = band
-            slider.target = self
-            slider.action = #selector(equalizerChanged(_:))
-            view.addSubview(slider)
-            equalizerSliders.append(slider)
-
-            let frequency = Equalizer.frequency(ofBand: band)
-            let label = NSTextField(labelWithString: frequency >= 1000
-                ? "\(Int(frequency / 1000))k" : "\(Int(frequency))")
-            label.frame = NSRect(x: x, y: 146, width: columnWidth, height: 14)
-            label.font = .systemFont(ofSize: 10, weight: .medium)
-            label.alignment = .center
-            view.addSubview(label)
-        }
-        return view
-    }
-
     /// "44,1 kHz" en español, "44.1 kHz" en inglés. Antes decía "44 kHz", que es
     /// justo el número que confunde a quien quiere saber si está en 44,1 o en 48.
     private func sampleRateTitle(_ rate: Double) -> String {
@@ -358,13 +340,13 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ? strings.loudnessHint : strings.transparentHint
 
         let equalizer = engine.processor.equalizer
-        for band in 0..<min(Equalizer.bandCount, equalizerSliders.count) {
-            let decibels = equalizer.gain(ofBand: band)
-            equalizerSliders[band].floatValue = decibels
-            equalizerValueLabels[band].stringValue = decibels == 0
-                ? "0" : String(format: "%+.0f", decibels)
-        }
+        let gains = (0..<Equalizer.bandCount).map { equalizer.gain(ofBand: $0) }
+        equalizerView.gains = gains
+        equalizerView.sampleRate = engine.info?.sampleRate ?? 48_000
         equalizerItem?.state = equalizer.isFlat ? .off : .on
+        for (index, entry) in presetItems.enumerated() {
+            entry.state = Self.presets[index].gains == gains ? .on : .off
+        }
         enabledItem?.state = isEnabled ? .on : .off
         retryItem?.isHidden = (lastError == nil)
 
@@ -418,6 +400,11 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func refreshMeter() {
+        if engine.processor.spectrum.isEnabled {
+            analyzer.update(from: engine.processor.spectrum,
+                            sampleRate: engine.info?.sampleRate ?? 48_000)
+            equalizerView.spectrum = analyzer.levels
+        }
         guard isEnabled, lastError == nil else {
             meter.level = 0
             meter.isLimiting = false
@@ -438,12 +425,22 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: Acciones
 
     func menuWillOpen(_ menu: NSMenu) {
+        if menu === equalizerMenu { engine.processor.spectrum.isEnabled = true }
         refreshChrome()
         refreshMeter()
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === sampleRateMenu { rebuildSampleRateMenu() }
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        // El espectro solo se calcula con el ecualizador a la vista.
+        if menu === equalizerMenu {
+            engine.processor.spectrum.isEnabled = false
+            analyzer.reset()
+            equalizerView.spectrum = []
+        }
     }
 
     @objc private func gainChanged() {
@@ -458,17 +455,9 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refreshChrome()
     }
 
-    @objc private func equalizerChanged(_ sender: NSSlider) {
-        // De a 1 dB: medio dB no se oye en un parlante de laptop y hace que el
-        // slider nunca vuelva exacto a cero.
-        engine.processor.equalizer.setGain(sender.floatValue.rounded(), ofBand: sender.tag)
-        saveEqualizer()
-        refreshChrome()
-    }
-
-    @objc private func flattenEqualizer() {
-        for band in 0..<Equalizer.bandCount {
-            engine.processor.equalizer.setGain(0, ofBand: band)
+    @objc private func presetChosen(_ sender: NSMenuItem) {
+        for (band, decibels) in Self.presets[sender.tag].gains.enumerated() {
+            engine.processor.equalizer.setGain(decibels, ofBand: band)
         }
         saveEqualizer()
         refreshChrome()

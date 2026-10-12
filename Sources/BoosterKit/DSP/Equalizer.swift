@@ -158,48 +158,86 @@ public final class Equalizer {
             }
             active |= 1 << band
 
-            // Nunca por encima de ~0,45 de la frecuencia de muestreo: a 44,1 kHz
-            // la banda de 12 kHz entra, pero un biquad pegado a Nyquist se vuelve
-            // inestable.
-            let frequency = min(Equalizer.frequency(ofBand: band), sampleRate * 0.45)
-            let a = pow(10, decibels / 40)
-            let w0 = 2 * Double.pi * frequency / sampleRate
-            let cosw = cos(w0)
-            let sinw = sin(w0)
-
-            var b0, b1, b2, a0, a1, a2: Double
-            switch Equalizer.kind(ofBand: band) {
-            case .peak:
-                let alpha = sinw / (2 * Equalizer.peakQ)
-                b0 = 1 + alpha * a
-                b1 = -2 * cosw
-                b2 = 1 - alpha * a
-                a0 = 1 + alpha / a
-                a1 = -2 * cosw
-                a2 = 1 - alpha / a
-            case .lowShelf:
-                let k = 2 * sqrt(a) * sinw / (2 * Equalizer.shelfQ)
-                b0 = a * ((a + 1) - (a - 1) * cosw + k)
-                b1 = 2 * a * ((a - 1) - (a + 1) * cosw)
-                b2 = a * ((a + 1) - (a - 1) * cosw - k)
-                a0 = (a + 1) + (a - 1) * cosw + k
-                a1 = -2 * ((a - 1) + (a + 1) * cosw)
-                a2 = (a + 1) + (a - 1) * cosw - k
-            case .highShelf:
-                let k = 2 * sqrt(a) * sinw / (2 * Equalizer.shelfQ)
-                b0 = a * ((a + 1) + (a - 1) * cosw + k)
-                b1 = -2 * a * ((a - 1) + (a + 1) * cosw)
-                b2 = a * ((a + 1) + (a - 1) * cosw - k)
-                a0 = (a + 1) - (a - 1) * cosw + k
-                a1 = 2 * ((a - 1) - (a + 1) * cosw)
-                a2 = (a + 1) - (a - 1) * cosw - k
-            }
-            c[0] = b0 / a0
-            c[1] = b1 / a0
-            c[2] = b2 / a0
-            c[3] = a1 / a0
-            c[4] = a2 / a0
+            let k = Equalizer.coefficients(band: band, decibels: decibels,
+                                           sampleRate: sampleRate)
+            c[0] = k.b0
+            c[1] = k.b1
+            c[2] = k.b2
+            c[3] = k.a1
+            c[4] = k.a2
         }
         activeBands = active
+    }
+
+    // MARK: Coeficientes y respuesta
+
+    public typealias Coefficients = (b0: Double, b1: Double, b2: Double, a1: Double, a2: Double)
+
+    /// Coeficientes normalizados de una banda. Es una función pura, así la usan
+    /// igual el hilo de audio y la interfaz cuando dibuja la curva: lo que se ve
+    /// es exactamente lo que suena.
+    public static func coefficients(band: Int, decibels: Double,
+                                    sampleRate: Double) -> Coefficients {
+        // Nunca por encima de ~0,45 de la frecuencia de muestreo: a 44,1 kHz la
+        // banda de 12 kHz entra, pero un biquad pegado a Nyquist se vuelve
+        // inestable.
+        let frequency = min(Equalizer.frequency(ofBand: band), sampleRate * 0.45)
+        let a = pow(10, decibels / 40)
+        let w0 = 2 * Double.pi * frequency / sampleRate
+        let cosw = cos(w0)
+        let sinw = sin(w0)
+
+        var b0, b1, b2, a0, a1, a2: Double
+        switch Equalizer.kind(ofBand: band) {
+        case .peak:
+            let alpha = sinw / (2 * Equalizer.peakQ)
+            b0 = 1 + alpha * a
+            b1 = -2 * cosw
+            b2 = 1 - alpha * a
+            a0 = 1 + alpha / a
+            a1 = -2 * cosw
+            a2 = 1 - alpha / a
+        case .lowShelf:
+            let k = 2 * sqrt(a) * sinw / (2 * Equalizer.shelfQ)
+            b0 = a * ((a + 1) - (a - 1) * cosw + k)
+            b1 = 2 * a * ((a - 1) - (a + 1) * cosw)
+            b2 = a * ((a + 1) - (a - 1) * cosw - k)
+            a0 = (a + 1) + (a - 1) * cosw + k
+            a1 = -2 * ((a - 1) + (a + 1) * cosw)
+            a2 = (a + 1) + (a - 1) * cosw - k
+        case .highShelf:
+            let k = 2 * sqrt(a) * sinw / (2 * Equalizer.shelfQ)
+            b0 = a * ((a + 1) + (a - 1) * cosw + k)
+            b1 = -2 * a * ((a - 1) + (a + 1) * cosw)
+            b2 = a * ((a + 1) + (a - 1) * cosw - k)
+            a0 = (a + 1) - (a - 1) * cosw + k
+            a1 = 2 * ((a - 1) - (a + 1) * cosw)
+            a2 = (a + 1) - (a - 1) * cosw - k
+        }
+        return (b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0)
+    }
+
+    /// Respuesta en dB de toda la cadena de bandas a una frecuencia, para unas
+    /// ganancias dadas. Evalúa cada biquad en el círculo unitario: es la curva
+    /// teórica exacta, no una aproximación dibujada a mano.
+    public static func responseDecibels(atFrequency frequency: Double, gains: [Float],
+                                        sampleRate: Double) -> Double {
+        let w = 2 * Double.pi * frequency / sampleRate
+        let (c1, s1) = (cos(w), sin(w))
+        let (c2, s2) = (cos(2 * w), sin(2 * w))
+        var total = 0.0
+        for (band, gain) in gains.prefix(bandCount).enumerated() where gain != 0 {
+            let k = coefficients(band: band, decibels: Double(gain), sampleRate: sampleRate)
+            // H(e^jw) = (b0 + b1 e^-jw + b2 e^-2jw) / (1 + a1 e^-jw + a2 e^-2jw)
+            let numeratorReal = k.b0 + k.b1 * c1 + k.b2 * c2
+            let numeratorImaginary = -(k.b1 * s1 + k.b2 * s2)
+            let denominatorReal = 1 + k.a1 * c1 + k.a2 * c2
+            let denominatorImaginary = -(k.a1 * s1 + k.a2 * s2)
+            let numerator = numeratorReal * numeratorReal + numeratorImaginary * numeratorImaginary
+            let denominator = denominatorReal * denominatorReal
+                + denominatorImaginary * denominatorImaginary
+            total += 10 * log10(max(numerator, 1e-30) / max(denominator, 1e-30))
+        }
+        return total
     }
 }
