@@ -22,7 +22,10 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         static let gain = "gain"
         static let mode = "mode"
         static let bufferFrames = "bufferFrames"
+        static let equalizer = "equalizerGains"
     }
+
+    private static let supportURL = URL(string: "https://paypal.me/carlostapiacl")!
 
     /// Tamaños de buffer que ofrece el menú.
     ///
@@ -48,6 +51,12 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let modeControl = NSSegmentedControl()
     private let meter = LevelMeterView()
     private let meterLabel = NSTextField(labelWithString: "")
+    private let modeHintLabel = NSTextField(labelWithString: "")
+    private var equalizerSliders: [NSSlider] = []
+    private var equalizerValueLabels: [NSTextField] = []
+    private var equalizerItem: NSMenuItem!
+    private var sampleRateMenu: NSMenu!
+    private var sampleRateError: String?
     private var enabledItem: NSMenuItem!
     private var retryItem: NSMenuItem!
     private var bufferItems: [NSMenuItem] = []
@@ -66,7 +75,10 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.button?.imagePosition = .imageLeading
         rebuildMenu()
 
-        engine.onDefaultOutputChanged = { [weak self] in self?.scheduleRestart() }
+        engine.onOutputChanged = { [weak self] in
+            self?.sampleRateError = nil
+            self?.scheduleRestart()
+        }
         startEngine()
 
         // .common para que el medidor siga vivo con el menú abierto: un menú
@@ -142,6 +154,25 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         latencyItem.submenu = latencyMenu
         menu.addItem(latencyItem)
 
+        // Se rearma cada vez que se abre: las frecuencias dependen del dispositivo
+        // de salida, que puede haber cambiado desde la última vez.
+        let sampleRateItem = NSMenuItem(title: strings.sampleRateMenu, action: nil, keyEquivalent: "")
+        sampleRateMenu = NSMenu()
+        sampleRateMenu.delegate = self
+        sampleRateMenu.autoenablesItems = false
+        sampleRateItem.submenu = sampleRateMenu
+        menu.addItem(sampleRateItem)
+
+        equalizerItem = NSMenuItem(title: strings.equalizerMenu, action: nil, keyEquivalent: "")
+        let equalizerMenu = NSMenu()
+        let equalizerPanel = NSMenuItem()
+        equalizerPanel.view = buildEqualizerPanel()
+        equalizerMenu.addItem(equalizerPanel)
+        equalizerMenu.addItem(.separator())
+        equalizerMenu.addItem(item(strings.equalizerFlat, #selector(flattenEqualizer)))
+        equalizerItem.submenu = equalizerMenu
+        menu.addItem(equalizerItem)
+
         let languageItem = NSMenuItem(title: strings.languageMenu, action: nil, keyEquivalent: "")
         let languageMenu = NSMenu()
         for (index, language) in AppLanguage.allCases.enumerated() {
@@ -157,6 +188,7 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(retryItem)
 
         menu.addItem(.separator())
+        menu.addItem(item(strings.support, #selector(openSupport)))
         menu.addItem(item(strings.quit, #selector(quit), key: "q"))
 
         statusItem.menu = menu
@@ -182,7 +214,7 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let width: CGFloat = 300
         let margin: CGFloat = 16
         let inner = width - margin * 2
-        let view = FlippedView(frame: NSRect(x: 0, y: 0, width: width, height: 168))
+        let view = FlippedView(frame: NSRect(x: 0, y: 0, width: width, height: 180))
 
         meterLabel.frame = NSRect(x: margin, y: 12, width: inner, height: 15)
         meterLabel.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular)
@@ -226,7 +258,92 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for segment in 0..<2 { modeControl.setWidth(inner / 2, forSegment: segment) }
         view.addSubview(modeControl)
 
+        // "¿El modo transparente no hace nada?" fue la primera pregunta de alguien
+        // que la probó. Con 100% de ganancia, no: hace falta decirlo en la cara.
+        modeHintLabel.frame = NSRect(x: margin, y: 155, width: inner, height: 15)
+        modeHintLabel.font = .systemFont(ofSize: 10)
+        modeHintLabel.textColor = .secondaryLabelColor
+        modeHintLabel.lineBreakMode = .byTruncatingTail
+        view.addSubview(modeHintLabel)
+
         return view
+    }
+
+    private func buildEqualizerPanel() -> NSView {
+        equalizerSliders.removeAll()
+        equalizerValueLabels.removeAll()
+
+        let columnWidth: CGFloat = 44
+        let margin: CGFloat = 14
+        let width = margin * 2 + columnWidth * CGFloat(Equalizer.bandCount)
+        let view = FlippedView(frame: NSRect(x: 0, y: 0, width: width, height: 170))
+        let limit = Double(Equalizer.maximumGainDecibels)
+
+        for band in 0..<Equalizer.bandCount {
+            let x = margin + columnWidth * CGFloat(band)
+
+            let value = NSTextField(labelWithString: "")
+            value.frame = NSRect(x: x, y: 8, width: columnWidth, height: 14)
+            value.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular)
+            value.textColor = .secondaryLabelColor
+            value.alignment = .center
+            view.addSubview(value)
+            equalizerValueLabels.append(value)
+
+            let slider = NSSlider()
+            slider.isVertical = true
+            slider.frame = NSRect(x: x + (columnWidth - 22) / 2, y: 26, width: 22, height: 116)
+            slider.minValue = -limit
+            slider.maxValue = limit
+            slider.numberOfTickMarks = 3          // −12, 0, +12
+            slider.isContinuous = true
+            slider.tag = band
+            slider.target = self
+            slider.action = #selector(equalizerChanged(_:))
+            view.addSubview(slider)
+            equalizerSliders.append(slider)
+
+            let frequency = Equalizer.frequency(ofBand: band)
+            let label = NSTextField(labelWithString: frequency >= 1000
+                ? "\(Int(frequency / 1000))k" : "\(Int(frequency))")
+            label.frame = NSRect(x: x, y: 146, width: columnWidth, height: 14)
+            label.font = .systemFont(ofSize: 10, weight: .medium)
+            label.alignment = .center
+            view.addSubview(label)
+        }
+        return view
+    }
+
+    /// "44,1 kHz" en español, "44.1 kHz" en inglés. Antes decía "44 kHz", que es
+    /// justo el número que confunde a quien quiere saber si está en 44,1 o en 48.
+    private func sampleRateTitle(_ rate: Double) -> String {
+        let kilohertz = String(format: "%g", rate / 1000)
+        let localized = AppLanguage.stored.resolved == .spanish
+            ? kilohertz.replacingOccurrences(of: ".", with: ",") : kilohertz
+        return "\(localized) kHz"
+    }
+
+    private func rebuildSampleRateMenu() {
+        sampleRateMenu.removeAllItems()
+        let (available, current) = BoostEngine.outputSampleRates()
+        guard !available.isEmpty else {
+            let empty = NSMenuItem(title: strings.sampleRateUnavailable, action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            sampleRateMenu.addItem(empty)
+            return
+        }
+        for rate in available {
+            let entry = item(sampleRateTitle(rate), #selector(sampleRateChosen(_:)))
+            entry.representedObject = rate
+            entry.state = rate == current ? .on : .off
+            sampleRateMenu.addItem(entry)
+        }
+        if let sampleRateError {
+            sampleRateMenu.addItem(.separator())
+            let failure = NSMenuItem(title: sampleRateError, action: nil, keyEquivalent: "")
+            failure.isEnabled = false
+            sampleRateMenu.addItem(failure)
+        }
     }
 
     // MARK: Refresco
@@ -237,6 +354,17 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         gainSlider.floatValue = engine.processor.gain * 100
         gainLabel.stringValue = "\(percent)%"
         modeControl.selectedSegment = engine.processor.mode == .loudness ? 1 : 0
+        modeHintLabel.stringValue = engine.processor.mode == .loudness
+            ? strings.loudnessHint : strings.transparentHint
+
+        let equalizer = engine.processor.equalizer
+        for band in 0..<min(Equalizer.bandCount, equalizerSliders.count) {
+            let decibels = equalizer.gain(ofBand: band)
+            equalizerSliders[band].floatValue = decibels
+            equalizerValueLabels[band].stringValue = decibels == 0
+                ? "0" : String(format: "%+.0f", decibels)
+        }
+        equalizerItem?.state = equalizer.isFlat ? .off : .on
         enabledItem?.state = isEnabled ? .on : .off
         retryItem?.isHidden = (lastError == nil)
 
@@ -269,8 +397,8 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 ? strings.stereo
                 : String(format: strings.channelsFormat, info.outputChannels)
             subtitleLabel.stringValue = String(
-                format: "%d kHz · %@ · +%.0f ms",
-                Int(info.sampleRate / 1000), channels, engine.addedLatencySeconds * 1000)
+                format: "%@ · %@ · +%.0f ms",
+                sampleRateTitle(info.sampleRate), channels, engine.addedLatencySeconds * 1000)
             subtitleLabel.textColor = .secondaryLabelColor
         }
 
@@ -282,7 +410,7 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let symbol = lastError != nil ? "exclamationmark.triangle.fill"
                       : !isEnabled ? "speaker.slash.fill" : nil {
             statusItem.button?.image = NSImage(systemSymbolName: symbol,
-                                               accessibilityDescription: "Audio Booster")
+                                               accessibilityDescription: "Subele")
         } else {
             statusItem.button?.image = MenuBarIcon.image(boosted: engine.processor.gain > 1.01)
         }
@@ -314,6 +442,10 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refreshMeter()
     }
 
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        if menu === sampleRateMenu { rebuildSampleRateMenu() }
+    }
+
     @objc private func gainChanged() {
         engine.processor.gain = gainSlider.floatValue / 100
         UserDefaults.standard.set(engine.processor.gain, forKey: Defaults.gain)
@@ -323,6 +455,46 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func modeChanged() {
         engine.processor.mode = modeControl.selectedSegment == 1 ? .loudness : .transparent
         UserDefaults.standard.set(engine.processor.mode.rawValue, forKey: Defaults.mode)
+        refreshChrome()
+    }
+
+    @objc private func equalizerChanged(_ sender: NSSlider) {
+        // De a 1 dB: medio dB no se oye en un parlante de laptop y hace que el
+        // slider nunca vuelva exacto a cero.
+        engine.processor.equalizer.setGain(sender.floatValue.rounded(), ofBand: sender.tag)
+        saveEqualizer()
+        refreshChrome()
+    }
+
+    @objc private func flattenEqualizer() {
+        for band in 0..<Equalizer.bandCount {
+            engine.processor.equalizer.setGain(0, ofBand: band)
+        }
+        saveEqualizer()
+        refreshChrome()
+    }
+
+    private func saveEqualizer() {
+        let equalizer = engine.processor.equalizer
+        UserDefaults.standard.set((0..<Equalizer.bandCount).map { equalizer.gain(ofBand: $0) },
+                                  forKey: Defaults.equalizer)
+    }
+
+    @objc private func sampleRateChosen(_ sender: NSMenuItem) {
+        guard let rate = sender.representedObject as? Double else { return }
+        do {
+            // La cadena se rehace sola: el motor observa la frecuencia del
+            // dispositivo y avisa por onOutputChanged cuando el cambio se aplicó.
+            try BoostEngine.setOutputSampleRate(rate)
+            sampleRateError = nil
+        } catch {
+            sampleRateError = strings.sampleRateFailed
+            NSSound.beep()
+        }
+    }
+
+    @objc private func openSupport() {
+        NSWorkspace.shared.open(Self.supportURL)
     }
 
     @objc private func resetGain() {
@@ -376,6 +548,11 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         let frames = storedBufferFrames()
         engine.preferredBufferFrames = frames > 0 ? frames : nil
+        if let gains = defaults.array(forKey: Defaults.equalizer) as? [Float] {
+            for (band, decibels) in gains.prefix(Equalizer.bandCount).enumerated() {
+                engine.processor.equalizer.setGain(decibels, ofBand: band)
+            }
+        }
     }
 
     /// "Ausente" y "automático" son respuestas distintas, así que el valor guardado

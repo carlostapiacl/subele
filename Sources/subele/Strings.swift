@@ -49,6 +49,7 @@ struct Strings {
     let latencyMenu: String
     let languageMenu: String
     let retry: String
+    let support: String
     let quit: String
     let systemLanguage: String
 
@@ -58,9 +59,18 @@ struct Strings {
     let bufferRelaxed: String
     let bufferAutomatic: String
 
+    // Frecuencia de muestreo y ecualizador
+    let sampleRateMenu: String
+    let sampleRateUnavailable: String
+    let sampleRateFailed: String
+    let equalizerMenu: String
+    let equalizerFlat: String
+
     // Panel
     let transparent: String
     let loudness: String
+    let transparentHint: String
+    let loudnessHint: String
     let notRunning: String
     let starting: String
     let disabled: String
@@ -102,7 +112,8 @@ struct Strings {
         latencyMenu: "Latency",
         languageMenu: "Language",
         retry: "Retry",
-        quit: "Quit Audio Booster",
+        support: "Support Subele…",
+        quit: "Quit Subele",
         systemLanguage: "System",
 
         bufferLowest: "Lowest — 128 frames",
@@ -110,8 +121,16 @@ struct Strings {
         bufferRelaxed: "Relaxed — 512 frames",
         bufferAutomatic: "Automatic",
 
-        transparent: "Transparent",
-        loudness: "Loudness",
+        sampleRateMenu: "Sample Rate",
+        sampleRateUnavailable: "Not available for this device",
+        sampleRateFailed: "Could not change it",
+        equalizerMenu: "Equalizer",
+        equalizerFlat: "Flat",
+
+        transparent: "Music",
+        loudness: "Voice",
+        transparentHint: "Louder, dynamics untouched. Works above 100%.",
+        loudnessHint: "Lifts quiet parts. For speech, calls and video.",
         notRunning: "Not running",
         starting: "Starting…",
         disabled: "Disabled",
@@ -128,7 +147,7 @@ struct Strings {
         modeLabel: "Mode",
         framesPerCallback: "frames/callback",
         commandsHelp: """
-          Commands:  50-400 = gain %  ·  t = transparent  ·  l = loudness
+          Commands:  50-400 = gain %  ·  m = music  ·  v = voice
                      d = latency  ·  s = status  ·  q = quit
         """,
         stopping: "Stopping…",
@@ -146,13 +165,13 @@ struct Strings {
             """,
         deviceChanged: "Output device changed. Rebuilding the chain…",
         couldNotRebuild: "Could not rebuild",
-        notUnderstood: "Not understood. A number between 50 and 400, or t / l / d / s / q.",
-        modeSetTransparent: "Mode: transparent (gain + limiter)",
-        modeSetLoudness: "Mode: loudness (compressor + makeup + limiter)",
+        notUnderstood: "Not understood. A number between 50 and 400, or m / v / d / s / q.",
+        modeSetTransparent: "Mode: music (gain + limiter)",
+        modeSetLoudness: "Mode: voice (compressor + makeup + limiter)",
         addedLatencyFormat: "Added latency: %.1f ms  (%.1f ms I/O + %.1f ms lookahead)",
         helpText: """
 
-              Audio Booster {version}
+              Subele {version}
               Raise macOS volume past 100% without installing a driver.
 
                 (no arguments)   menu bar app
@@ -161,7 +180,7 @@ struct Strings {
                 --version
                 --help
 
-              BOOSTER_TRACE=1 traces every startup step to stderr.
+              SUBELE_TRACE=1 traces every startup step to stderr.
 
             """
     )
@@ -172,7 +191,8 @@ struct Strings {
         latencyMenu: "Latencia",
         languageMenu: "Idioma",
         retry: "Reintentar",
-        quit: "Salir de Audio Booster",
+        support: "Apoyar Subele…",
+        quit: "Salir de Subele",
         systemLanguage: "Sistema",
 
         bufferLowest: "Mínima — 128 frames",
@@ -180,8 +200,16 @@ struct Strings {
         bufferRelaxed: "Holgada — 512 frames",
         bufferAutomatic: "Automática",
 
-        transparent: "Transparente",
-        loudness: "Loudness",
+        sampleRateMenu: "Frecuencia de muestreo",
+        sampleRateUnavailable: "No disponible en este dispositivo",
+        sampleRateFailed: "No se pudo cambiar",
+        equalizerMenu: "Ecualizador",
+        equalizerFlat: "Plano",
+
+        transparent: "Música",
+        loudness: "Voz",
+        transparentHint: "Sube sin tocar la dinámica. Se nota sobre 100%.",
+        loudnessHint: "Sube lo bajo. Para voz, llamadas y video.",
         notRunning: "No está corriendo",
         starting: "Arrancando…",
         disabled: "Desactivado",
@@ -198,7 +226,7 @@ struct Strings {
         modeLabel: "Modo",
         framesPerCallback: "frames/callback",
         commandsHelp: """
-          Comandos:  50-400 = ganancia %  ·  t = transparente  ·  l = loudness
+          Comandos:  50-400 = ganancia %  ·  m = música  ·  v = voz
                      d = latencia  ·  s = estado  ·  q = salir
         """,
         stopping: "Cerrando…",
@@ -216,13 +244,13 @@ struct Strings {
             """,
         deviceChanged: "Cambió el dispositivo de salida. Rehaciendo la cadena…",
         couldNotRebuild: "No se pudo rehacer",
-        notUnderstood: "No entendí. Un número entre 50 y 400, o t / l / d / s / q.",
-        modeSetTransparent: "Modo: transparente (ganancia + limitador)",
-        modeSetLoudness: "Modo: loudness (compresor + makeup + limitador)",
+        notUnderstood: "No entendí. Un número entre 50 y 400, o m / v / d / s / q.",
+        modeSetTransparent: "Modo: música (ganancia + limitador)",
+        modeSetLoudness: "Modo: voz (compresor + makeup + limitador)",
         addedLatencyFormat: "Latencia agregada: %.1f ms  (%.1f ms E/S + %.1f ms lookahead)",
         helpText: """
 
-              Audio Booster {version}
+              Subele {version}
               Sube el volumen de macOS más allá del 100% sin instalar drivers.
 
                 (sin argumentos)  app de barra de menú
@@ -231,7 +259,7 @@ struct Strings {
                 --version
                 --help
 
-              BOOSTER_TRACE=1 traza cada paso del arranque a stderr.
+              SUBELE_TRACE=1 traza cada paso del arranque a stderr.
 
             """
     )

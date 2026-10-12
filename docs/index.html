@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Audio Booster — sube el volumen de macOS sin instalar drivers</title>
+<title>Subele — sube el volumen de macOS sin instalar drivers</title>
 <meta name="description" content="Sube macOS más allá del 100% sin instalar drivers. Construido sobre la API de process tap de macOS 14.2, con un limitador de lookahead para que no clipee.">
 <link rel="icon" href="icon.png">
-<meta property="og:title" content="Audio Booster">
+<meta property="og:title" content="Subele">
 <meta property="og:description" content="Sube el volumen de macOS más allá del 100% sin instalar drivers.">
 <meta property="og:image" content="icon.png">
 <style>
@@ -51,6 +51,7 @@
   }
   .btn:hover { filter: brightness(1.12); }
   .btn.ghost { background: transparent; color: var(--text); border-color: var(--line); }
+  .btn.give { background: transparent; color: var(--amber); border-color: rgba(255,176,32,.45); }
   .req { color: var(--muted); font-size: 13.5px; margin-top: 16px; }
   .req.open { margin-top: 6px; }
   .req.open strong { color: var(--text); }
@@ -108,16 +109,19 @@
 
 <header>
   <div class="wrap">
-    <img src="icon.png" alt="Audio Booster">
-    <h1>Audio Booster</h1>
+    <img src="icon.png" alt="Subele">
+    <h1>Subele</h1>
     <p class="tag" data-lang="es" class="on">Sube el volumen de macOS más allá del 100% sin instalar drivers, y sin que suene a parlante reventado.</p>
     <p class="tag" data-lang="en">Turn macOS past 100% without installing a driver, and without it sounding like a blown speaker.</p>
     <div class="buttons">
-      <a class="btn" href="https://github.com/carlostapiacl/audio-booster/releases/latest">
+      <a class="btn" href="https://github.com/carlostapiacl/subele/releases/latest">
         <span data-lang="es">Descargar para macOS</span><span data-lang="en">Download for macOS</span>
       </a>
-      <a class="btn ghost" href="https://github.com/carlostapiacl/audio-booster">
+      <a class="btn ghost" href="https://github.com/carlostapiacl/subele">
         <span data-lang="es">Ver el código</span><span data-lang="en">View the source</span>
+      </a>
+      <a class="btn give" href="https://paypal.me/carlostapiacl">
+        <span data-lang="es">Apoyar con una donación</span><span data-lang="en">Chip in</span>
       </a>
     </div>
     <p class="req">
@@ -125,8 +129,8 @@
       <span data-lang="en">macOS 14.2 or later · Intel and Apple Silicon · free, no account, no telemetry</span>
     </p>
     <p class="req open">
-      <span data-lang="es"><strong>Código abierto (MIT).</strong> Todo lo que corre en tu máquina está a la vista: <a href="https://github.com/carlostapiacl/audio-booster">leelo antes de instalarlo</a>.</span>
-      <span data-lang="en"><strong>Open source (MIT).</strong> Everything that runs on your machine is out in the open: <a href="https://github.com/carlostapiacl/audio-booster">read it before you install it</a>.</span>
+      <span data-lang="es"><strong>Código abierto (MIT).</strong> Todo lo que corre en tu máquina está a la vista: <a href="https://github.com/carlostapiacl/subele">leelo antes de instalarlo</a>.</span>
+      <span data-lang="en"><strong>Open source (MIT).</strong> Everything that runs on your machine is out in the open: <a href="https://github.com/carlostapiacl/subele">read it before you install it</a>.</span>
     </p>
   </div>
 </header>
@@ -137,7 +141,7 @@
     <p>Todos los amplificadores de volumen de macOS funcionan igual desde hace una década: instalan un driver de audio, se ponen como salida por defecto del sistema y pasan el audio hacia el hardware real. Driver que firmar, instalador, <code>sudo</code>, tu salida secuestrada, y algo que se rompe en cada actualización.</p>
     <p><strong>macOS 14.2 volvió todo eso innecesario.</strong> <code>AudioHardwareCreateProcessTap</code> es una API pública que captura lo que otros procesos reproducen, sin driver de por medio.</p>
     <table>
-      <tr><th></th><th>Boosters con driver</th><th>Audio Booster</th></tr>
+      <tr><th></th><th>Boosters con driver</th><th>Subele</th></tr>
       <tr><td>Instala driver</td><td>sí, con <code>sudo</code></td><td class="good">no</td></tr>
       <tr><td>Toma tu salida por defecto</td><td>sí</td><td class="good">no</td></tr>
       <tr><td>Al subir el volumen</td><td>ganancia cruda, clipping</td><td class="good">limitador con lookahead</td></tr>
@@ -149,12 +153,27 @@
     <p>Every volume booster on macOS has worked the same way for a decade: install an audio driver, make itself the system's default output, and pass audio through to the real hardware. A driver to sign, an installer, <code>sudo</code>, your output device hijacked, and something that breaks with every OS update.</p>
     <p><strong>macOS 14.2 made all of that unnecessary.</strong> <code>AudioHardwareCreateProcessTap</code> is a public API that captures what other processes are playing, with no driver involved.</p>
     <table>
-      <tr><th></th><th>Driver-based boosters</th><th>Audio Booster</th></tr>
+      <tr><th></th><th>Driver-based boosters</th><th>Subele</th></tr>
       <tr><td>Installs a driver</td><td>yes, with <code>sudo</code></td><td class="good">no</td></tr>
       <tr><td>Takes over default output</td><td>yes</td><td class="good">no</td></tr>
       <tr><td>Turning it up</td><td>raw gain, clipping</td><td class="good">lookahead limiter</td></tr>
       <tr><td>Uninstall</td><td>remove the driver</td><td class="good">delete the app</td></tr>
     </table>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div data-lang="es">
+    <h2>Qué trae</h2>
+    <p><strong>Dos modos.</strong> <em>Música</em> sube parejo sin tocar la dinámica: en 100% no cambia nada, a propósito, y se nota recién al subir. <em>Voz</em> comprime y levanta lo bajo, para llamadas, podcasts y video con audio flojo.</p>
+    <p><strong>Ecualizador de cinco bandas</strong> (60 Hz a 12 kHz, ±12 dB). Va antes del limitador, así que subir los graves no hace clipear.</p>
+    <p><strong>Frecuencia de muestreo desde el menú.</strong> Pasar la salida de 44,1 a 48 o 96 kHz sin abrir Configuración de Audio MIDI, que casi nadie sabe que existe.</p>
+  </div>
+  <div data-lang="en">
+    <h2>What you get</h2>
+    <p><strong>Two modes.</strong> <em>Music</em> turns it up evenly with dynamics untouched: at 100% it changes nothing, on purpose, and you hear it once you go higher. <em>Voice</em> compresses and lifts the quiet parts, for calls, podcasts and video with weak audio.</p>
+    <p><strong>Five-band equalizer</strong> (60 Hz to 12 kHz, ±12 dB). It sits before the limiter, so boosting the bass does not clip.</p>
+    <p><strong>Sample rate from the menu.</strong> Switch the output from 44.1 to 48 or 96 kHz without opening Audio MIDI Setup, which few people know exists.</p>
   </div>
 </div></section>
 
@@ -214,46 +233,46 @@
     <p>Esta app <strong>captura todo el audio de tu sistema</strong>. Es lo que tiene que hacer para funcionar, pero significa que te está pidiendo un permiso enorme. No deberías dárselo a un binario que no podés leer.</p>
     <p>Todo el código está publicado bajo licencia MIT: el motor de audio, el procesamiento, la interfaz, el script que arma la app e incluso el que dibuja el ícono. Podés leer exactamente qué hace con el audio y comprobar que no sale de tu máquina — no hay servidor, no hay cuenta, no hay telemetría, no hay red.</p>
     <p>Y si preferís no confiar en el <code>.dmg</code> que yo publiqué, <a href="#instalacion">compilalo vos</a> desde el mismo código. Sale idéntico.</p>
-    <p><a class="btn ghost" href="https://github.com/carlostapiacl/audio-booster">Ver el código en GitHub</a></p>
+    <p><a class="btn ghost" href="https://github.com/carlostapiacl/subele">Ver el código en GitHub</a></p>
   </div>
   <div data-lang="en">
     <h2>Open source, and here it matters more than usual</h2>
     <p>This app <strong>captures all of your system audio</strong>. That is what it has to do in order to work, but it means it is asking you for an enormous permission. You should not grant that to a binary you cannot read.</p>
     <p>All of the code is published under the MIT licence: the audio engine, the processing, the interface, the script that assembles the app, even the one that draws the icon. You can read exactly what it does with your audio and confirm that none of it leaves your machine — there is no server, no account, no telemetry, no network.</p>
     <p>And if you would rather not trust the <code>.dmg</code> I published, <a href="#instalacion">build it yourself</a> from the same source. It comes out identical.</p>
-    <p><a class="btn ghost" href="https://github.com/carlostapiacl/audio-booster">View the source on GitHub</a></p>
+    <p><a class="btn ghost" href="https://github.com/carlostapiacl/subele">View the source on GitHub</a></p>
   </div>
 </div></section>
 
 <section id="instalacion"><div class="wrap">
   <div data-lang="es">
     <h2>Instalación</h2>
-    <p>Abrí el <code>.dmg</code> y arrastrá Audio Booster a Aplicaciones.</p>
+    <p>Abrí el <code>.dmg</code> y arrastrá Subele a Aplicaciones.</p>
     <div class="note">
       <h3>macOS la va a bloquear la primera vez</h3>
       <p>La app está firmada pero <strong>no notarizada</strong>: notarizar exige una cuenta de Apple Developer paga. Vas a ver «Apple no pudo verificar que esté libre de malware». Para destrabarla:</p>
       <p><strong>Ajustes del Sistema → Privacidad y seguridad</strong>, bajá hasta el aviso y tocá <strong>Abrir igualmente</strong>. O en la Terminal:</p>
-      <pre><code>xattr -d com.apple.quarantine "/Applications/Audio Booster.app"</code></pre>
+      <pre><code>xattr -d com.apple.quarantine "/Applications/Subele.app"</code></pre>
       <p class="muted" style="margin-bottom:0">En macOS 15 el viejo Control-clic → Abrir ya no alcanza.</p>
     </div>
     <p>Si preferís no confiar en un binario sin notarizar —razonable—, compilala vos. No necesita Xcode:</p>
-    <pre><code>git clone https://github.com/carlostapiacl/audio-booster
-cd audio-booster
+    <pre><code>git clone https://github.com/carlostapiacl/subele
+cd subele
 ./build-app.sh</code></pre>
   </div>
   <div data-lang="en">
     <h2>Install</h2>
-    <p>Open the <code>.dmg</code> and drag Audio Booster to Applications.</p>
+    <p>Open the <code>.dmg</code> and drag Subele to Applications.</p>
     <div class="note">
       <h3>macOS will block it the first time</h3>
       <p>The app is signed but <strong>not notarised</strong> — notarisation requires a paid Apple Developer account. You will see "Apple could not verify this app is free of malware". To get past it:</p>
       <p><strong>System Settings → Privacy &amp; Security</strong>, scroll to the notice and click <strong>Open Anyway</strong>. Or in Terminal:</p>
-      <pre><code>xattr -d com.apple.quarantine "/Applications/Audio Booster.app"</code></pre>
+      <pre><code>xattr -d com.apple.quarantine "/Applications/Subele.app"</code></pre>
       <p class="muted" style="margin-bottom:0">On macOS 15 the old Control-click → Open trick is no longer enough.</p>
     </div>
     <p>If you would rather not trust an un-notarised binary — fair — build it yourself. No Xcode needed:</p>
-    <pre><code>git clone https://github.com/carlostapiacl/audio-booster
-cd audio-booster
+    <pre><code>git clone https://github.com/carlostapiacl/subele
+cd subele
 ./build-app.sh</code></pre>
   </div>
 </div></section>
@@ -261,13 +280,13 @@ cd audio-booster
 <section><div class="wrap">
   <div data-lang="es">
     <h2>Apoyar</h2>
-    <p>Audio Booster es gratis y va a seguir siéndolo. No tiene versión paga, ni cuenta, ni nada guardado para después.</p>
+    <p>Subele es gratis y va a seguir siéndolo. No tiene versión paga, ni cuenta, ni nada guardado para después.</p>
     <p>Si te resultó útil y querés colaborar, se agradece — y si no, usala igual, para eso está.</p>
     <p><a class="btn" href="https://paypal.me/carlostapiacl">Donar por PayPal</a></p>
   </div>
   <div data-lang="en">
     <h2>Support</h2>
-    <p>Audio Booster is free and will stay that way. There is no paid tier, no account, nothing held back for later.</p>
+    <p>Subele is free and will stay that way. There is no paid tier, no account, nothing held back for later.</p>
     <p>If you found it useful and want to chip in, it is appreciated — and if not, use it anyway, that is what it is for.</p>
     <p><a class="btn" href="https://paypal.me/carlostapiacl">Donate with PayPal</a></p>
   </div>
@@ -275,7 +294,7 @@ cd audio-booster
 
 <footer>
   <p>
-    MIT · <a href="https://github.com/carlostapiacl/audio-booster">GitHub</a> ·
+    MIT · <a href="https://github.com/carlostapiacl/subele">GitHub</a> ·
     <span data-lang="es">hecho por</span><span data-lang="en">built by</span>
     <a href="https://carlostapia.cl">Carlos Tapia</a>
   </p>

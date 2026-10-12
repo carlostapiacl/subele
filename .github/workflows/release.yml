@@ -25,11 +25,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" dist/*.dmg \
-            --title "Audio Booster $GITHUB_REF_NAME" \
+            --title "Subele $GITHUB_REF_NAME" \
             --notes-file - <<'NOTES'
           ## Instalación
 
-          Descargá el `.dmg`, abrilo y arrastrá **Audio Booster** a Aplicaciones.
+          Descargá el `.dmg`, abrilo y arrastrá **Subele** a Aplicaciones.
 
           ### La primera vez macOS la va a bloquear
 
@@ -40,10 +40,10 @@ jobs:
           Para destrabarla, una de estas dos:
 
           - **Ajustes del Sistema → Privacidad y seguridad**, bajá hasta el aviso
-            sobre Audio Booster y tocá **Abrir igualmente**.
+            sobre Subele y tocá **Abrir igualmente**.
           - O en la Terminal:
             ```
-            xattr -d com.apple.quarantine "/Applications/Audio Booster.app"
+            xattr -d com.apple.quarantine "/Applications/Subele.app"
             ```
 
           Si preferís no confiar en un binario sin notarizar —razonable—, compilala
@@ -54,12 +54,12 @@ jobs:
           <details>
           <summary>English</summary>
 
-          Download the `.dmg`, open it and drag **Audio Booster** to Applications.
+          Download the `.dmg`, open it and drag **Subele** to Applications.
 
           The app is ad-hoc signed but **not notarised**, so macOS will block it the
           first time. Either go to **System Settings → Privacy & Security** and click
           **Open Anyway**, or run
-          `xattr -d com.apple.quarantine "/Applications/Audio Booster.app"`.
+          `xattr -d com.apple.quarantine "/Applications/Subele.app"`.
 
           Or build it yourself with `./build-app.sh` — it takes seconds and needs no
           Xcode.

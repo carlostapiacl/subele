@@ -1,5 +1,5 @@
 #!/bin/bash
-# Arma "Audio Booster.app" a mano. SwiftPM no genera bundles y este proyecto se
+# Arma "Subele.app" a mano. SwiftPM no genera bundles y este proyecto se
 # compila sin Xcode, así que la estructura y el Info.plist se escriben acá.
 #
 # El ícono también se genera: es código (Tools/make-icon.swift), no un binario
@@ -7,8 +7,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP="Audio Booster.app"
-ID="cl.carlostapia.audio-booster"
+APP="Subele.app"
+ID="cl.carlostapia.subele"
 # Una sola fuente de verdad para la versión: la del código.
 VERSION=$(sed -n 's/.*let version = "\(.*\)"/\1/p' Sources/BoosterKit/Booster.swift)
 
@@ -44,9 +44,9 @@ echo "▸ Armando ${APP}…"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 lipo -create \
-    ".build-x86_64/release/booster" \
-    ".build-arm64/release/booster" \
-    -output "$APP/Contents/MacOS/booster"
+    ".build-x86_64/release/subele" \
+    ".build-arm64/release/subele" \
+    -output "$APP/Contents/MacOS/subele"
 cp Tools/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
@@ -54,10 +54,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>Audio Booster</string>
-    <key>CFBundleDisplayName</key><string>Audio Booster</string>
+    <key>CFBundleName</key><string>Subele</string>
+    <key>CFBundleDisplayName</key><string>Subele</string>
     <key>CFBundleIdentifier</key><string>$ID</string>
-    <key>CFBundleExecutable</key><string>booster</string>
+    <key>CFBundleExecutable</key><string>subele</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
@@ -72,7 +72,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleLocalizations</key>
     <array><string>en</string><string>es</string></array>
     <key>NSAudioCaptureUsageDescription</key>
-    <string>Audio Booster procesa el audio del sistema para subir el volumen sin distorsión.</string>
+    <string>Subele procesa el audio del sistema para subir el volumen sin distorsión.</string>
 </dict>
 </plist>
 PLIST
@@ -84,9 +84,9 @@ codesign --force --sign - --timestamp=none "$APP" 2>&1 | sed 's/^/   /'
 
 echo "▸ Verificando…"
 codesign --verify --verbose=1 "$APP" 2>&1 | sed 's/^/   /'
-lipo -archs "$APP/Contents/MacOS/booster" | sed 's/^/   arquitecturas: /'
+lipo -archs "$APP/Contents/MacOS/subele" | sed 's/^/   arquitecturas: /'
 
 echo
 echo "  Listo:   $(pwd)/$APP"
 echo "  Abrir:   open '$APP'"
-echo "  Consola: '$APP/Contents/MacOS/booster' --cli"
+echo "  Consola: '$APP/Contents/MacOS/subele' --cli"

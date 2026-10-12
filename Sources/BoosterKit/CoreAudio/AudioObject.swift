@@ -113,13 +113,13 @@ public enum AudioObject {
     }
 }
 
-/// Traza sin búfer a stderr, se enciende con `BOOSTER_TRACE=1`.
+/// Traza sin búfer a stderr, se enciende con `SUBELE_TRACE=1`.
 ///
 /// Las llamadas a CoreAudio pueden bloquearse indefinidamente sin devolver error
 /// — un tap sobre un dispositivo que es dueño otro driver virtual hace exactamente
 /// eso. Con stdout bufferizado, un cuelgue así no deja ningún rastro, así que los
 /// pasos se marcan por acá.
 public func trace(_ message: @autoclosure () -> String) {
-    guard ProcessInfo.processInfo.environment["BOOSTER_TRACE"] != nil else { return }
+    guard ProcessInfo.processInfo.environment["SUBELE_TRACE"] != nil else { return }
     FileHandle.standardError.write("[trace] \(message())\n".data(using: .utf8)!)
 }

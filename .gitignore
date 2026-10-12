@@ -3,7 +3,7 @@
 .swiftpm/
 *.o
 *.dSYM/
-Audio Booster.app/
+Subele.app/
 Tools/AppIcon.iconset/
 Tools/AppIcon.icns
 dist/

@@ -46,24 +46,93 @@ public enum AudioDevices {
         return object
     }
 
+    // MARK: Frecuencia de muestreo
+
+    /// La frecuencia a la que corre el dispositivo, la misma que muestra
+    /// Configuración de Audio MIDI.
+    public static func nominalSampleRate(of device: AudioObjectID) throws -> Double {
+        try AudioObject.value(device, kAudioDevicePropertyNominalSampleRate,
+                              initial: Float64(0),
+                              describing: "leer la frecuencia de muestreo")
+    }
+
+    /// Cambia la frecuencia del dispositivo para todo el sistema, igual que
+    /// hacerlo a mano en Configuración de Audio MIDI. El cambio es asíncrono: el
+    /// dispositivo avisa cuando lo terminó de aplicar.
+    public static func setNominalSampleRate(_ rate: Double, of device: AudioObjectID) throws {
+        try AudioObject.setValue(device, kAudioDevicePropertyNominalSampleRate,
+                                 to: Float64(rate),
+                                 describing: "cambiar la frecuencia de muestreo a \(Int(rate)) Hz")
+    }
+
+    /// Frecuencias que el dispositivo acepta, de menor a mayor.
+    ///
+    /// CoreAudio las entrega como rangos. Casi siempre cada rango es un solo valor,
+    /// pero algunas interfaces declaran un rango continuo; de esos se ofrecen las
+    /// frecuencias estándar que caen adentro, no infinitas opciones.
+    public static func availableSampleRates(of device: AudioObjectID) -> [Double] {
+        var address = AudioObject.address(kAudioDevicePropertyAvailableNominalSampleRates)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(device, &address, 0, nil, &size) == noErr,
+              size > 0 else { return [] }
+        let count = Int(size) / MemoryLayout<AudioValueRange>.stride
+        var ranges = [AudioValueRange](repeating: AudioValueRange(), count: count)
+        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &ranges) == noErr
+        else { return [] }
+
+        let standard: [Double] = [44_100, 48_000, 88_200, 96_000, 176_400, 192_000]
+        var rates = Set<Double>()
+        for range in ranges {
+            if range.mMinimum == range.mMaximum {
+                rates.insert(range.mMinimum)
+            } else {
+                for rate in standard where rate >= range.mMinimum && rate <= range.mMaximum {
+                    rates.insert(rate)
+                }
+            }
+        }
+        return rates.sorted()
+    }
+
+    // MARK: Observadores
+
     /// Llama a `handler` en la cola principal cada vez que cambia el dispositivo de
     /// salida por defecto. Devuelve un token que quita el listener al soltarse.
     public static func observeDefaultOutput(_ handler: @escaping () -> Void) -> Any? {
-        var address = AudioObject.address(kAudioHardwarePropertyDefaultOutputDevice)
-        let block: AudioObjectPropertyListenerBlock = { _, _ in handler() }
-        let status = AudioObjectAddPropertyListenerBlock(
-            AudioObject.system, &address, DispatchQueue.main, block)
-        guard status == noErr else { return nil }
-        return DefaultOutputObserver(block: block)
+        observe(AudioObject.system, kAudioHardwarePropertyDefaultOutputDevice, handler)
     }
 
-    private final class DefaultOutputObserver {
+    /// Llama a `handler` en la cola principal cada vez que cambia la frecuencia de
+    /// muestreo del dispositivo, se cambie desde acá o desde Configuración de
+    /// Audio MIDI.
+    public static func observeSampleRate(of device: AudioObjectID,
+                                         _ handler: @escaping () -> Void) -> Any? {
+        observe(device, kAudioDevicePropertyNominalSampleRate, handler)
+    }
+
+    private static func observe(_ object: AudioObjectID,
+                                _ selector: AudioObjectPropertySelector,
+                                _ handler: @escaping () -> Void) -> Any? {
+        var address = AudioObject.address(selector)
+        let block: AudioObjectPropertyListenerBlock = { _, _ in handler() }
+        let status = AudioObjectAddPropertyListenerBlock(
+            object, &address, DispatchQueue.main, block)
+        guard status == noErr else { return nil }
+        return PropertyObserver(object: object, address: address, block: block)
+    }
+
+    private final class PropertyObserver {
+        private let object: AudioObjectID
+        private var address: AudioObjectPropertyAddress
         private let block: AudioObjectPropertyListenerBlock
-        init(block: @escaping AudioObjectPropertyListenerBlock) { self.block = block }
+        init(object: AudioObjectID, address: AudioObjectPropertyAddress,
+             block: @escaping AudioObjectPropertyListenerBlock) {
+            self.object = object
+            self.address = address
+            self.block = block
+        }
         deinit {
-            var address = AudioObject.address(kAudioHardwarePropertyDefaultOutputDevice)
-            AudioObjectRemovePropertyListenerBlock(
-                AudioObject.system, &address, DispatchQueue.main, block)
+            AudioObjectRemovePropertyListenerBlock(object, &address, DispatchQueue.main, block)
         }
     }
 }

@@ -17,6 +17,7 @@ import Foundation
 public final class BoostEngine {
 
     public struct Info: Sendable {
+        public let deviceID: AudioDeviceID
         public let deviceName: String
         public let sampleRate: Double
         public let inputChannels: Int
@@ -27,9 +28,11 @@ public final class BoostEngine {
     public let processor = BoostProcessor()
 
     /// Se llama en la cola principal cuando macOS cambia el dispositivo de salida
-    /// por defecto. Un tap está atado a un dispositivo, así que sin rehacer la
-    /// cadena seguiríamos procesando para hardware que ya nadie escucha.
-    public var onDefaultOutputChanged: (() -> Void)?
+    /// por defecto o cuando ese dispositivo cambia de frecuencia de muestreo. Un
+    /// tap está atado a un dispositivo y a un formato, así que sin rehacer la
+    /// cadena seguiríamos procesando para hardware que ya nadie escucha, o a una
+    /// frecuencia que ya no es la suya.
+    public var onOutputChanged: (() -> Void)?
 
     /// Frames por callback que se le piden al dispositivo agregado. Más bajo es
     /// menos latencia y más despertadas; el dispositivo ajusta a lo que soporte.
@@ -41,7 +44,7 @@ public final class BoostEngine {
 
     /// Medida, no estimada: la distancia entre el timestamp del audio que entra y
     /// el timestamp en que se va a reproducir, tomada del IOProc.
-    public var measuredIOLatencySeconds: Double { latencyBox.pointee }
+    public var measuredIOLatencySeconds: Double { Double(latency.value) }
 
     /// Todo lo que esta cadena agrega por sobre reproducir derecho al dispositivo.
     public var addedLatencySeconds: Double {
@@ -52,6 +55,7 @@ public final class BoostEngine {
     private var aggregate: AggregateDevice?
     private var ioProcID: AudioDeviceIOProcID?
     private var defaultOutputObserver: Any?
+    private var sampleRateObserver: Any?
 
     /// Buffer intercalado de trabajo, para reunir la entrada y repartir la salida.
     /// Se asigna una vez y vive tanto como el motor: liberarlo mientras un IOProc
@@ -59,28 +63,24 @@ public final class BoostEngine {
     private let maximumFrames = 8192
     private let scratch: UnsafeMutablePointer<Float>
 
-    /// La latencia medida vive en un puntero crudo, no en una propiedad del motor.
-    /// El callback necesita escribirla, y llegar hasta `self` desde ahí obligaría a
-    /// capturarlo débil: una carga de referencia débil **toma un lock** en el
-    /// runtime de Swift, y un lock en el hilo de audio es justo lo que no se puede
-    /// hacer — puede invertir prioridades y cortar el audio. Un puntero capturado
-    /// por valor no toca ARC ni bloquea nada.
-    private let latencyBox: UnsafeMutablePointer<Double>
+    /// La latencia medida vive en su propio atómico, no en una propiedad del
+    /// motor. El callback necesita escribirla, y llegar hasta `self` desde ahí
+    /// obligaría a capturarlo débil: una carga de referencia débil **toma un
+    /// lock** en el runtime de Swift, y un lock en el hilo de audio es justo lo que
+    /// no se puede hacer — puede invertir prioridades y cortar el audio. El atómico
+    /// se captura fuerte, y leerlo desde la interfaz no es una carrera.
+    private let latency = AtomicFloat(0)
 
     public init(preferredBufferFrames: UInt32? = nil) {
         self.preferredBufferFrames = preferredBufferFrames
         scratch = .allocate(capacity: maximumFrames * Limiter.maximumChannels)
         scratch.initialize(repeating: 0, count: maximumFrames * Limiter.maximumChannels)
-        latencyBox = .allocate(capacity: 1)
-        latencyBox.initialize(to: 0)
     }
 
     deinit {
         stop()
         scratch.deinitialize(count: maximumFrames * Limiter.maximumChannels)
         scratch.deallocate()
-        latencyBox.deinitialize(count: 1)
-        latencyBox.deallocate()
     }
 
     public func start() throws {
@@ -118,7 +118,8 @@ public final class BoostEngine {
             throw AudioError("el tap no entregó audio float32 lineal")
         }
 
-        let info = Info(deviceName: deviceName,
+        let info = Info(deviceID: outputDevice,
+                        deviceName: deviceName,
                         sampleRate: inputFormat.mSampleRate,
                         inputChannels: Int(inputFormat.mChannelsPerFrame),
                         outputChannels: Int(outputFormat.mChannelsPerFrame),
@@ -135,7 +136,10 @@ public final class BoostEngine {
                   "arrancar el dispositivo agregado")
 
         defaultOutputObserver = AudioDevices.observeDefaultOutput { [weak self] in
-            self?.onDefaultOutputChanged?()
+            self?.onOutputChanged?()
+        }
+        sampleRateObserver = AudioDevices.observeSampleRate(of: outputDevice) { [weak self] in
+            self?.onOutputChanged?()
         }
         isRunning = true
         trace("corriendo")
@@ -147,7 +151,7 @@ public final class BoostEngine {
         // tocar ARC o a tomar un lock por cada vuelta.
         let processor = self.processor
         let scratch = self.scratch
-        let latencyBox = self.latencyBox
+        let latency = self.latency
         let maximumFrames = self.maximumFrames
         let maximumChannels = Limiter.maximumChannels
 
@@ -189,7 +193,7 @@ public final class BoostEngine {
             else { return }
             frames = min(frames, maximumFrames)
 
-            BoostEngine.recordLatency(input: inputTime, output: outputTime, into: latencyBox)
+            BoostEngine.recordLatency(input: inputTime, output: outputTime, into: latency)
 
             if input.count == 1, output.count == 1, inputChannels == outputChannels {
                 // El caso común: un solo buffer intercalado en cada punta.
@@ -247,7 +251,7 @@ public final class BoostEngine {
     /// Estática y sin tocar `self` a propósito: se llama desde el hilo de audio.
     private static func recordLatency(input: UnsafePointer<AudioTimeStamp>,
                                       output: UnsafePointer<AudioTimeStamp>,
-                                      into box: UnsafeMutablePointer<Double>) {
+                                      into latency: AtomicFloat) {
         let inputStamp = input.pointee
         let outputStamp = output.pointee
         guard inputStamp.mFlags.contains(.hostTimeValid),
@@ -255,11 +259,12 @@ public final class BoostEngine {
         let inputNanos = AudioConvertHostTimeToNanos(inputStamp.mHostTime)
         let outputNanos = AudioConvertHostTimeToNanos(outputStamp.mHostTime)
         guard outputNanos > inputNanos else { return }
-        box.pointee = Double(outputNanos - inputNanos) / 1_000_000_000
+        latency.value = Float(Double(outputNanos - inputNanos) / 1_000_000_000)
     }
 
     public func stop() {
         defaultOutputObserver = nil
+        sampleRateObserver = nil
         if let ioProcID, let aggregate {
             AudioDeviceStop(aggregate.objectID, ioProcID)
             AudioDeviceDestroyIOProcID(aggregate.objectID, ioProcID)
@@ -271,5 +276,30 @@ public final class BoostEngine {
         tap = nil
         info = nil
         isRunning = false
+    }
+
+    // MARK: Frecuencia de muestreo
+
+    /// Frecuencias que acepta la salida por defecto, y la que tiene puesta ahora.
+    public static func outputSampleRates() -> (available: [Double], current: Double?) {
+        guard let device = try? AudioDevices.defaultOutput() else { return ([], nil) }
+        return (AudioDevices.availableSampleRates(of: device),
+                try? AudioDevices.nominalSampleRate(of: device))
+    }
+
+    /// Cambia la frecuencia de la salida por defecto, como Configuración de Audio
+    /// MIDI pero sin abrirla.
+    ///
+    /// No rehace la cadena acá: el cambio es asíncrono, y el observador de
+    /// frecuencia dispara `onOutputChanged` cuando el dispositivo lo terminó de
+    /// aplicar. Así el camino es el mismo que si lo cambiaran desde afuera.
+    ///
+    /// Lo que gana y lo que no: subir de 44,1 a 96 kHz no agrega detalle a una
+    /// grabación de 44,1. Lo que puede cambiar es que el sistema deje de convertir
+    /// de frecuencia cuando el material ya viene a la del dispositivo, y hay
+    /// interfaces que suenan distinto según a cuánto corren.
+    public static func setOutputSampleRate(_ rate: Double) throws {
+        let device = try AudioDevices.defaultOutput()
+        try AudioDevices.setNominalSampleRate(rate, of: device)
     }
 }

@@ -1,6 +1,6 @@
-# audio-booster
+# Subele
 
-[![test](https://github.com/carlostapiacl/audio-booster/actions/workflows/test.yml/badge.svg)](https://github.com/carlostapiacl/audio-booster/actions/workflows/test.yml)
+[![test](https://github.com/carlostapiacl/subele/actions/workflows/test.yml/badge.svg)](https://github.com/carlostapiacl/subele/actions/workflows/test.yml)
 [![license](https://img.shields.io/badge/license-MIT-222)](LICENSE)
 [![macOS](https://img.shields.io/badge/macOS-14.2%2B-222)](#requirements)
 [![no dependencies](https://img.shields.io/badge/dependencies-0-222)](Package.swift)
@@ -13,6 +13,9 @@ blown speaker.**
 A menu bar app. Move the slider, the system gets louder. What is unusual is
 underneath: no kernel extension, no audio driver, and your default output device
 is never taken over.
+
+It is free and open source. If it helps you, [a donation is appreciated](https://paypal.me/carlostapiacl);
+if not, use it anyway. *(It used to be called audio-booster.)*
 
 ---
 
@@ -29,7 +32,7 @@ breaks every time Apple ships an OS update.
 public API that captures what other processes are playing — no driver involved.
 This project is built on it.
 
-|  | driver-based boosters | audio-booster |
+|  | driver-based boosters | Subele |
 | --- | --- | --- |
 | Installs a driver | yes, with `sudo` | no |
 | Takes over default output | yes | **no** |
@@ -91,15 +94,44 @@ gain lands on the ceiling, not through it.
 
 ## Modes
 
-- **Transparent** — gain and limiting only. Dynamics untouched; what was loud
-  relative to what was quiet still is. For music.
-- **Loudness** — adds compression with automatic makeup gain, lifting quiet parts
+- **Music** — gain and limiting only. Dynamics untouched; what was loud relative
+  to what was quiet still is. **At 100% gain it does nothing, on purpose**: you
+  hear it once you go higher and the limiter starts working. The panel says so
+  under the switch, because it was the first thing someone asked after trying it.
+- **Voice** — adds compression with automatic makeup gain, lifting quiet parts
   instead of flattening loud ones. For speech, calls, and video with weak audio.
+  This one is audible at 100%.
+
+(Earlier versions called them *Transparent* and *Loudness*.)
 
 Makeup gain is not a refinement, it is the whole point of putting a compressor
 there. A compressor without makeup makes audio *quieter*. The first version of
 this DSP shipped that mistake and measured quieter at 300% gain than at 100%.
 There is a test pinning that down too.
+
+## Equalizer
+
+Five bands, ±12 dB: a low shelf at 60 Hz, peaks at 250 Hz, 1 kHz and 4 kHz, and a
+high shelf at 12 kHz. They are Robert Bristow-Johnson cookbook biquads with
+double-precision state, and they sit **before** the compressor and limiter:
+boosting bass adds energy, and placed there the limiter sees that peak like any
+other instead of letting it clip.
+
+With every band at 0 dB the output is bit-identical to the input. There is a test
+for that, one checking each band boosts by what it says, and one that pushes
+everything to +12 dB at five sample rates to make sure nothing goes unstable.
+
+## Sample rate
+
+The **Sample Rate** menu switches the output between the rates the device accepts
+(44.1, 48, 96 kHz…), the same as doing it in Audio MIDI Setup, without having to
+know that app exists. The change is system-wide, and the chain rebuilds itself
+once the device has applied it, including when it is changed from elsewhere.
+
+What it does and does not buy you: going from 44.1 to 96 kHz adds no detail to a
+44.1 kHz recording. What can change is that macOS stops resampling and that the
+interface sounds different at its preferred rate. Some people hear it clearly, and
+it used to live in a hidden app.
 
 ## Latency
 
@@ -133,8 +165,10 @@ this project is built without Xcode.
 
 ### Download
 
-Grab the `.dmg` from the [latest release](https://github.com/carlostapiacl/audio-booster/releases/latest),
-open it and drag **Audio Booster** to Applications.
+> Free. If it helps: [donate via PayPal](https://paypal.me/carlostapiacl).
+
+Grab the `.dmg` from the [latest release](https://github.com/carlostapiacl/subele/releases/latest),
+open it and drag **Subele** to Applications.
 
 **macOS will block it the first time.** The app is ad-hoc signed but **not
 notarised** — notarisation requires a paid Apple Developer account (USD 99/year).
@@ -145,7 +179,7 @@ it, either:
   Booster and click **Open Anyway**.
 - Or in Terminal:
   ```bash
-  xattr -d com.apple.quarantine "/Applications/Audio Booster.app"
+  xattr -d com.apple.quarantine "/Applications/Subele.app"
   ```
 
 On macOS 15 the old Control-click → Open trick is no longer enough; you have to go
@@ -156,10 +190,10 @@ through System Settings.
 If you would rather not trust an un-notarised binary — fair — it takes seconds:
 
 ```bash
-git clone https://github.com/carlostapiacl/audio-booster
-cd audio-booster
+git clone https://github.com/carlostapiacl/subele
+cd subele
 ./build-app.sh
-open "Audio Booster.app"
+open "Subele.app"
 ```
 
 `build-app.sh` builds release, runs the tests, generates the icon, assembles the
@@ -182,20 +216,26 @@ percentage.
 
 A speaker icon appears in the menu bar. Opening it gives you the output device and
 format, a level meter that turns orange while the limiter is working, a 50–400%
-slider, the mode switch, a latency setting and a language picker.
+slider, the mode switch with what each one does, and menus for latency, sample
+rate, equalizer and language.
 
-Gain, mode, latency and language persist between launches.
+Gain, mode, equalizer, latency and language persist between launches. The sample
+rate is not stored by the app: it belongs to the device, and macOS remembers it.
+
+Everything that crosses between the UI and the audio thread — gain, mode,
+equalizer bands and meters — goes through atomics (`Sources/CAtomics`, because
+Swift's `Atomic` needs macOS 15).
 
 One binary, two faces — the `.app` bundle just wraps it:
 
 ```bash
-booster              # menu bar app
-booster --cli        # interactive console
-booster --cli --buffer 128
-booster --help
+subele              # menu bar app
+subele --cli        # interactive console
+subele --cli --buffer 128
+subele --help
 ```
 
-`BOOSTER_TRACE=1` traces every startup step to stderr. CoreAudio calls can block
+`SUBELE_TRACE=1` traces every startup step to stderr. CoreAudio calls can block
 indefinitely without returning an error, and when stdout is buffered such a hang
 leaves no trace at all.
 
@@ -214,7 +254,8 @@ hardware.
 
 What they pin down: exact gain while there is headroom, the limiter reaching the
 ceiling but never passing it, transients from silence to full scale, bit-identical
-output across block sizes from 32 to 1024, every channel count from mono to 7.1,
+output across block sizes from 32 to 1024, a flat equalizer leaving every bit
+alone and each band boosting by what it says, every channel count from mono to 7.1,
 and NaN or infinity arriving in the input without killing the chain.
 
 ## Known limitations
@@ -223,11 +264,10 @@ and NaN or infinity arriving in the input without killing the chain.
   running it owns the default output device, so we tap *its* virtual device,
   which is itself passing audio through. `AudioDeviceCreateIOProcIDWithBlock`
   then blocks forever with no error. Quit it first.
-- **Parameters are written without synchronisation.** `gain` and `mode` are
-  written by the UI thread and read by the audio thread. On x86-64 and arm64 an
-  aligned 4-byte load or store is atomic in hardware, so nothing goes wrong in
-  practice, but it is formally a data race. Fixing it properly needs atomics.
-- **Loudness mode raises the noise floor**, since makeup applies when there is no
+- **AirPlay, unconfirmed.** AirPlay speakers keep their own buffer of about two
+  seconds and it has not been tested whether the aggregate device accepts them as
+  an output (to be confirmed). Bluetooth works.
+- **Voice mode raises the noise floor**, since makeup applies when there is no
   signal too. Inherent to the mode, not a defect.
 - **It does not start at login.** Deliberate: no login item is installed without
   being asked for.
@@ -235,6 +275,7 @@ and NaN or infinity arriving in the input without killing the chain.
 ## Layout
 
 ```
+Sources/CAtomics/            atomic loads and stores for the parameters
 Sources/BoosterKit/          the reusable part, no AppKit
   CoreAudio/
     AudioObject.swift        typed wrapper over the property API, errors, tracing
@@ -244,11 +285,12 @@ Sources/BoosterKit/          the reusable part, no AppKit
   DSP/
     Decibels.swift           dB conversions and smoothing coefficients
     Compressor.swift         soft-knee curve and automatic makeup
+    Equalizer.swift          5 RBJ biquads, coefficients recomputed on the audio thread
     Limiter.swift            delay line and sliding-window minimum
     BoostProcessor.swift     the chain
   Engine/
     BoostEngine.swift        tap + aggregate + IOProc + latency measurement
-Sources/booster/             the executable
+Sources/subele/              the executable
   main.swift                 picks a mode from the arguments
   MenuBarApp.swift           AppKit front end
   LevelMeterView.swift
@@ -266,12 +308,7 @@ can be embedded in something else.
 
 ## Site
 
-[carlostapiacl.github.io/audio-booster](https://carlostapiacl.github.io/audio-booster/) — the project page, in `docs/`.
-
-## Support
-
-It is free and will stay that way. If you found it useful and want to chip in:
-[PayPal](https://paypal.me/carlostapiacl). And if not, use it anyway.
+[carlostapiacl.github.io/subele](https://carlostapiacl.github.io/subele/) — the project page, in `docs/`.
 
 ## License
 
