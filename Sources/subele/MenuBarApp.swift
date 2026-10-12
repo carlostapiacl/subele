@@ -75,9 +75,10 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var bufferItems: [NSMenuItem] = []
     private var languageItems: [NSMenuItem] = []
 
-    /// Cacheado, no calculado. `Strings.current` devuelve un struct con treinta
-    /// campos String: leerlo en cada tick del medidor eran treinta retains, veinte
-    /// veces por segundo, para un valor que solo cambia cuando cambia el idioma.
+    /// Cacheado, no calculado. `Strings.current` devuelve un struct con más de
+    /// cincuenta campos String: leerlo en cada tick del medidor eran otros tantos
+    /// retains, veinte veces por segundo, para un valor que solo cambia cuando
+    /// cambia el idioma.
     private var strings = Strings.current
 
     // MARK: Ciclo de vida
