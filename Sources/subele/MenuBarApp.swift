@@ -192,9 +192,13 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         equalizerMenu.addItem(equalizerPanel)
         equalizerMenu.addItem(.separator())
         presetItems.removeAll()
+        // Filas con vista en vez de ítems comunes: un ítem común cierra el menú
+        // al elegirlo y se llevaba el gráfico que uno quería seguir ajustando.
         for (index, preset) in Self.presets.enumerated() {
-            let entry = item(strings[keyPath: preset.name], #selector(presetChosen(_:)))
-            entry.tag = index
+            let entry = NSMenuItem()
+            entry.view = StayOpenMenuRow(title: strings[keyPath: preset.name]) { [weak self] in
+                self?.applyPreset(index)
+            }
             equalizerMenu.addItem(entry)
             presetItems.append(entry)
         }
@@ -347,6 +351,7 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         equalizerItem?.state = equalizer.isFlat ? .off : .on
         for (index, entry) in presetItems.enumerated() {
             entry.state = Self.presets[index].gains == gains ? .on : .off
+            entry.view?.needsDisplay = true      // la fila dibuja su propio check
         }
         enabledItem?.state = isEnabled ? .on : .off
         retryItem?.isHidden = (lastError == nil)
@@ -456,8 +461,8 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refreshChrome()
     }
 
-    @objc private func presetChosen(_ sender: NSMenuItem) {
-        for (band, decibels) in Self.presets[sender.tag].gains.enumerated() {
+    private func applyPreset(_ index: Int) {
+        for (band, decibels) in Self.presets[index].gains.enumerated() {
             engine.processor.equalizer.setGain(decibels, ofBand: band)
         }
         saveEqualizer()
