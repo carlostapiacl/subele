@@ -404,7 +404,9 @@ can be embedded in something else.
 
 ## Site
 
-[carlostapiacl.github.io/subele](https://carlostapiacl.github.io/subele/) — the project page, in `docs/`.
+[carlostapiacl.github.io/subele](https://carlostapiacl.github.io/subele/) — the project page, in `docs/`. It counts visits and
+downloads with Plausible, without cookies; the app sends nothing. The share images are
+regenerated with `swift Tools/make-og.swift`.
 
 ## License
 

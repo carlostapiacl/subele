@@ -405,7 +405,9 @@ motor se puede embeber en otra cosa.
 
 ## Sitio
 
-[carlostapiacl.github.io/subele](https://carlostapiacl.github.io/subele/) — la página del proyecto, en `docs/`.
+[carlostapiacl.github.io/subele](https://carlostapiacl.github.io/subele/) — la página del proyecto, en `docs/`. Cuenta visitas y
+descargas con Plausible, sin cookies; la app no envía nada. Las imágenes para compartir
+se rehacen con `swift Tools/make-og.swift`.
 
 ## Licencia
 
