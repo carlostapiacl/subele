@@ -23,7 +23,7 @@ if not, use it anyway. *(It used to be called audio-booster.)*
 
 ## Why this exists
 
-Every volume booster on macOS has worked the same way for a decade. Boom 3D,
+For a decade, volume boosters on macOS all worked the same way. Boom 3D,
 eqMac and the rest install an `AudioServerPlugIn` into
 `/Library/Audio/Plug-Ins/HAL`, make themselves the system's default output
 device, and pass audio through to the real hardware. That means a driver to sign,
@@ -32,20 +32,25 @@ breaks every time Apple ships an OS update.
 
 **macOS 14.2 made all of that unnecessary.** `AudioHardwareCreateProcessTap` is a
 public API that captures what other processes are playing — no driver involved.
-This project is built on it.
+This project is built on it, and it is not the only one:
+[FineTune](https://github.com/ronitsingh10/FineTune) also uses taps and does far
+more (per-app volume, routing, AutoEQ). What sets Subele apart is how it boosts.
 
 |  | driver-based boosters | Subele |
 | --- | --- | --- |
 | Installs a driver | yes, with `sudo` | no |
 | Takes over default output | yes | **no** |
-| Turning it up | raw gain, then clipping | lookahead limiter, no clipping |
-| Per-app control | no | possible (the tap takes a process list) |
 | Uninstall | driver removal | delete the app |
 
-The second row is the one people feel. Multiplying a signal by three means
-everything above a third of full scale gets its tops shorn off, and sheared
-waveforms are that thin, tinny "boosted" sound. A limiter that sees the peak
-before it arrives does not have to shear anything.
+Multiplying a signal by three means everything above a third of full scale goes
+over, and something has to be done about it. Clipping or rounding off every
+sample that goes over, which is what a *soft clipper* does, bends the waveform, and
+that is where the thin, tinny "boosted" sound comes from. A limiter that sees the peak before it arrives turns
+the whole gain down and bends nothing. With a 1 kHz sine at 400%, the soft
+limiter FineTune publishes gives 23% harmonic distortion going in at −6 dBFS
+(`Tools/thd-softclip.py`); Subele gives 0.0004% with the same signal (test
+`boostingDoesNotDistort`). It is a test signal, and recording each
+app's actual output is still to be done (to be confirmed).
 
 ## How it works
 
@@ -118,8 +123,8 @@ ceiling, the waveform the converter reconstructs can exceed it: a sine at a
 quarter of the sample rate with a 45° phase has every sample at −3 dBFS and
 really reaches 0 dBFS. Step 2 looks at the sample and three interpolated points
 up to the next one (×4 oversampling, as in ITU-R BS.1770) and computes the gain
-against the largest. It is an estimate —a 12-tap interpolator, not an ideal
-one— and the test for that sine requires the output to land within 0.1 dB of
+against the largest. It is an estimate made with a 12-tap interpolator, and the
+test for that sine requires the output to land within 0.1 dB of
 the ceiling.
 
 The slider's gain doesn't jump either: it chases the new value over about 10 ms,
@@ -167,8 +172,8 @@ everything to +12 dB at five sample rates to make sure nothing goes unstable.
 
 The **Sample Rate** menu switches the output between the rates the device accepts
 (44.1, 48, 96 kHz…), the same as doing it in Audio MIDI Setup, without having to
-know that app exists. The change is system-wide —other apps using that device switch rate too, and
-the menu says so—, and the chain rebuilds itself
+know that app exists. The change is system-wide (other apps using that device switch rate too, and
+the menu says so), and the chain rebuilds itself
 once the device has applied it, including when it is changed from elsewhere.
 
 What it does and does not buy you: going from 44.1 to 96 kHz adds no detail to a
@@ -325,7 +330,7 @@ the work buffer, incompatible formats (16-bit, float64, big-endian, more than 32
 channels) rejected before the tap exists, an aggregate that takes a while to get
 ready, an `AudioDeviceStop` that fails without leaving freed memory under a live
 callback, a hundred starts and stops without leaking, and the watchdog rebuilding
-the chain when the IOProc stalls —and giving up when that doesn't help—.
+the chain when the IOProc stalls, or giving up when that doesn't help.
 
 What they do **not** cover, left for real hardware (to be confirmed): specific
 duplex USB interfaces, unplugging Bluetooth mid-playback, and starting without
@@ -385,6 +390,9 @@ Sources/subele/              the executable
   ConsoleMode.swift
   Strings.swift              every visible string, typed, in two languages
 Tools/make-icon.swift        generates AppIcon.icns
+Tools/make-og.swift          generates the site's share images
+Tools/thd-softclip.py        distortion of a per-sample soft limiter, for comparison
+docs/                        the site: / in Spanish, /en/ in English
 Tests/BoosterKitTests/       DSP, renderer, engine and controller on FakeAudioHAL
 ```
 

@@ -2,344 +2,192 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Subele — sube el volumen de macOS sin instalar drivers</title>
-<meta name="description" content="Sube macOS más allá del 100% sin instalar drivers. Construido sobre la API de process tap de macOS 14.2, con un limitador de lookahead para que no clipee.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Subele | Sube el volumen de tu Mac más allá del 100 %, gratis y sin drivers</title>
+<meta name="description" content="Amplificador de volumen gratis para Mac. Sube el sonido hasta 400 % sin distorsión, sin instalar drivers y sin cuenta. Código abierto, macOS 14.2 o posterior.">
+<link rel="canonical" href="https://carlostapiacl.github.io/subele/">
+<link rel="alternate" hreflang="es" href="https://carlostapiacl.github.io/subele/">
+<link rel="alternate" hreflang="en" href="https://carlostapiacl.github.io/subele/en/">
+<link rel="alternate" hreflang="x-default" href="https://carlostapiacl.github.io/subele/en/">
 <link rel="icon" href="icon.png">
-<meta property="og:title" content="Subele">
-<meta property="og:description" content="Sube el volumen de macOS más allá del 100% sin instalar drivers.">
-<meta property="og:image" content="https://carlostapiacl.github.io/subele/screenshot-ecualizador.png">
-<style>
-  :root {
-    --ink: #0d0b24;
-    --ink-2: #171440;
-    --indigo: #6c7aff;
-    --amber: #ffb020;
-    --text: #e8e7f5;
-    --muted: #9a97bd;
-    --line: rgba(255,255,255,.1);
-  }
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body {
-    margin: 0;
-    background: var(--ink);
-    color: var(--text);
-    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-  }
-  a { color: var(--indigo); }
-  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
-
-  header {
-    text-align: center;
-    padding: 72px 0 56px;
-    background:
-      radial-gradient(90% 120% at 50% -20%, rgba(108,122,255,.32), transparent 60%),
-      linear-gradient(180deg, var(--ink-2), var(--ink));
-    border-bottom: 1px solid var(--line);
-  }
-  header img { width: 132px; height: 132px; border-radius: 28px; }
-  h1 { font-size: 40px; letter-spacing: -.02em; margin: 22px 0 8px; }
-  .tag { color: var(--muted); font-size: 18px; margin: 0 auto 32px; max-width: 30em; }
-
-  .buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-  .btn {
-    display: inline-block; padding: 13px 26px; border-radius: 11px;
-    font-weight: 600; text-decoration: none; font-size: 16px;
-    background: var(--indigo); color: #fff; border: 1px solid transparent;
-  }
-  .btn:hover { filter: brightness(1.12); }
-  .btn.ghost { background: transparent; color: var(--text); border-color: var(--line); }
-  .btn.give { background: transparent; color: var(--amber); border-color: rgba(255,176,32,.45); }
-  .req { color: var(--muted); font-size: 13.5px; margin-top: 16px; }
-  .req.open { margin-top: 6px; }
-  .req.open strong { color: var(--text); }
-
-  section { padding: 52px 0; border-bottom: 1px solid var(--line); }
-
-  .shot { padding: 44px 0 8px; text-align: center; border-bottom: 1px solid var(--line); }
-  .shot img {
-    width: 100%; max-width: 640px; height: auto; display: block; margin: 0 auto;
-    filter: drop-shadow(0 18px 40px rgba(0,0,0,.45));
-  }
-  .shot figcaption { color: var(--muted); font-size: 13.5px; margin: 18px auto 36px; max-width: 34em; }
-  .features { display: grid; gap: 14px; margin-top: 18px; }
-  .feature { background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
-  .feature h3 { margin: 0 0 6px; font-size: 16px; }
-  .feature p { margin: 0; color: var(--muted); }
-  @media (min-width: 640px) { .features { grid-template-columns: 1fr 1fr; } }
-  h2 { font-size: 22px; letter-spacing: -.01em; margin: 0 0 14px; }
-  p { margin: 0 0 15px; }
-  .muted { color: var(--muted); }
-
-  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 15px; }
-  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); }
-  th { color: var(--muted); font-weight: 600; }
-  td.good { color: var(--amber); }
-  tr.hi td { background: rgba(255,176,32,.07); }
-
-  .note {
-    background: rgba(255,176,32,.08);
-    border: 1px solid rgba(255,176,32,.3);
-    border-radius: 12px; padding: 18px 20px; margin: 20px 0;
-  }
-  .note h3 { margin: 0 0 8px; font-size: 16px; color: var(--amber); }
-  code {
-    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-    background: rgba(255,255,255,.08); padding: 2px 6px; border-radius: 5px;
-  }
-  pre {
-    background: rgba(0,0,0,.35); border: 1px solid var(--line);
-    border-radius: 10px; padding: 14px 16px; overflow-x: auto;
-  }
-  pre code { background: none; padding: 0; }
-  ol { padding-left: 20px; }
-  ol li { margin-bottom: 7px; }
-
-  footer { padding: 36px 0 56px; text-align: center; color: var(--muted); font-size: 14px; }
-
-  .lang { position: fixed; top: 16px; right: 16px; display: flex; gap: 4px; z-index: 10; }
-  .lang button {
-    background: rgba(255,255,255,.07); color: var(--muted); border: 1px solid var(--line);
-    border-radius: 8px; padding: 5px 11px; font-size: 13px; font-weight: 600; cursor: pointer;
-    font-family: inherit;
-  }
-  .lang button[aria-pressed="true"] { background: var(--indigo); color: #fff; border-color: transparent; }
-  [data-lang] { display: none; }
-  [data-lang].on { display: block; }
-  th[data-lang].on, td[data-lang].on { display: table-cell; }
-  span[data-lang].on { display: inline; }
-</style>
+<link rel="stylesheet" href="site.css">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_CL">
+<meta property="og:url" content="https://carlostapiacl.github.io/subele/">
+<meta property="og:title" content="Subele | Más volumen para tu Mac, sin drivers">
+<meta property="og:description" content="¿Tu Mac al 100 % y se escucha bajo? Subele lo sube hasta 400 % sin que suene reventado. Gratis y de código abierto.">
+<meta property="og:image" content="https://carlostapiacl.github.io/subele/og-es.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Subele",
+  "description": "Amplificador de volumen para macOS. Sube el audio del sistema hasta 400 % sin instalar drivers, con un limitador que evita la distorsión.",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "macOS 14.2 o posterior",
+  "softwareVersion": "0.2.2",
+  "inLanguage": ["es", "en"],
+  "url": "https://carlostapiacl.github.io/subele/",
+  "downloadUrl": "https://github.com/carlostapiacl/subele/releases/latest/download/Subele.dmg",
+  "image": "https://carlostapiacl.github.io/subele/screenshot-ecualizador.png",
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Person", "name": "Carlos Tapia", "url": "https://carlostapia.cl" }
+}
+</script>
+<!-- Plausible: sin cookies ni datos personales. Cuenta visitas y descargas. -->
+<script defer data-domain="carlostapiacl.github.io" src="https://plausible.carlostapia.cl/js/script.file-downloads.outbound-links.js"></script>
 </head>
 <body>
 
-<div class="lang">
-  <button id="btn-es" aria-pressed="true" onclick="setLang('es')">ES</button>
-  <button id="btn-en" aria-pressed="false" onclick="setLang('en')">EN</button>
-</div>
-
-<header>
+<header class="hero">
   <div class="wrap">
-    <img src="icon.png" alt="Subele">
-    <h1>Subele</h1>
-    <p class="tag" data-lang="es">Sube el volumen de macOS más allá del 100% sin instalar drivers, y sin que suene a parlante reventado.</p>
-    <p class="tag" data-lang="en">Turn macOS past 100% without installing a driver, and without it sounding like a blown speaker.</p>
-    <div class="buttons">
-      <a class="btn" href="https://github.com/carlostapiacl/subele/releases/latest">
-        <span data-lang="es">Descargar para macOS</span><span data-lang="en">Download for macOS</span>
-      </a>
-      <a class="btn ghost" href="https://github.com/carlostapiacl/subele">
-        <span data-lang="es">Ver el código</span><span data-lang="en">View the source</span>
-      </a>
-      <a class="btn give" href="https://paypal.me/carlostapiacl">
-        <span data-lang="es">Apoyar con una donación</span><span data-lang="en">Chip in</span>
-      </a>
+    <nav class="top">
+      <a class="brand" href="./"><img src="icon.png" alt="" width="28" height="28">Subele</a>
+      <a class="lang" href="en/" hreflang="en" lang="en">English</a>
+    </nav>
+    <p class="ask">¿Tu Mac está al 100 % y todavía se escucha bajo?</p>
+    <h1>Sube el volumen de tu Mac más allá del 100 %</h1>
+    <p class="sub">Subele sube el sonido de videos, música y llamadas hasta 400 % sin que suene reventado. No instala drivers, no pide cuenta y es gratis.</p>
+    <div class="actions">
+      <a class="btn" href="https://github.com/carlostapiacl/subele/releases/latest/download/Subele.dmg">Descargar gratis para Mac</a>
+      <a class="btn ghost" href="#instalacion">Cómo se instala</a>
     </div>
-    <p class="req">
-      <span data-lang="es">macOS 14.2 o posterior · Intel y Apple Silicon · gratis, sin cuenta, sin telemetría</span>
-      <span data-lang="en">macOS 14.2 or later · Intel and Apple Silicon · free, no account, no telemetry</span>
-    </p>
-    <p class="req open">
-      <span data-lang="es"><strong>Código abierto (MIT).</strong> Todo lo que corre en tu máquina está a la vista: <a href="https://github.com/carlostapiacl/subele">leelo antes de instalarlo</a>.</span>
-      <span data-lang="en"><strong>Open source (MIT).</strong> Everything that runs on your machine is out in the open: <a href="https://github.com/carlostapiacl/subele">read it before you install it</a>.</span>
-    </p>
+    <p class="req">macOS 14.2 o posterior · Intel y Apple Silicon · código abierto (MIT)</p>
   </div>
 </header>
 
 <figure class="shot"><div class="wrap">
   <img src="screenshot-ecualizador.png" width="675" height="642"
-       alt="El menú de Subele con el ecualizador gráfico abierto / Subele's menu with the graphical equalizer open">
-  <figcaption>
-    <span data-lang="es">La app real, en la barra de menú: ganancia, modo, y el ecualizador con la curva que se arrastra y el espectro de lo que está sonando.</span>
-    <span data-lang="en">The real app, in the menu bar: gain, mode, and the equalizer with its draggable curve and a live spectrum of what is playing.</span>
-  </figcaption>
+       alt="El menú de Subele en la barra de menú, con el slider de volumen, el selector Música/Voz y el ecualizador gráfico abierto">
+  <figcaption>Vive en la barra de menú. Lo abres, mueves el slider y sigues en lo tuyo.</figcaption>
 </div></figure>
 
 <section><div class="wrap">
-  <div data-lang="es">
-    <h2>Por qué es distinto</h2>
-    <p>Todos los amplificadores de volumen de macOS funcionan igual desde hace una década: instalan un driver de audio, se ponen como salida por defecto del sistema y pasan el audio hacia el hardware real. Driver que firmar, instalador, <code>sudo</code>, tu salida secuestrada, y algo que se rompe en cada actualización.</p>
-    <p><strong>macOS 14.2 volvió todo eso innecesario.</strong> <code>AudioHardwareCreateProcessTap</code> es una API pública que captura lo que otros procesos reproducen, sin driver de por medio.</p>
-    <table>
-      <tr><th></th><th>Boosters con driver</th><th>Subele</th></tr>
-      <tr><td>Instala driver</td><td>sí, con <code>sudo</code></td><td class="good">no</td></tr>
-      <tr><td>Toma tu salida por defecto</td><td>sí</td><td class="good">no</td></tr>
-      <tr><td>Al subir el volumen</td><td>ganancia cruda, clipping</td><td class="good">limitador con lookahead</td></tr>
-      <tr><td>Desinstalar</td><td>sacar el driver</td><td class="good">borrar la app</td></tr>
-    </table>
-  </div>
-  <div data-lang="en">
-    <h2>Why it is different</h2>
-    <p>Every volume booster on macOS has worked the same way for a decade: install an audio driver, make itself the system's default output, and pass audio through to the real hardware. A driver to sign, an installer, <code>sudo</code>, your output device hijacked, and something that breaks with every OS update.</p>
-    <p><strong>macOS 14.2 made all of that unnecessary.</strong> <code>AudioHardwareCreateProcessTap</code> is a public API that captures what other processes are playing, with no driver involved.</p>
-    <table>
-      <tr><th></th><th>Driver-based boosters</th><th>Subele</th></tr>
-      <tr><td>Installs a driver</td><td>yes, with <code>sudo</code></td><td class="good">no</td></tr>
-      <tr><td>Takes over default output</td><td>yes</td><td class="good">no</td></tr>
-      <tr><td>Turning it up</td><td>raw gain, clipping</td><td class="good">lookahead limiter</td></tr>
-      <tr><td>Uninstall</td><td>remove the driver</td><td class="good">delete the app</td></tr>
-    </table>
-  </div>
+  <h2>Cuándo sirve</h2>
+  <ul class="cases">
+    <li>Un video o un curso grabado bajo, que ni al máximo se entiende.</li>
+    <li>Una llamada de Zoom, Meet o Teams en la que la otra persona habla despacio.</li>
+    <li>Los parlantes del MacBook, que se quedan cortos en una pieza con ruido.</li>
+    <li>Un podcast o una película con diálogos bajos y explosiones fuertes.</li>
+  </ul>
 </div></section>
 
 <section><div class="wrap">
-  <div data-lang="es">
-    <h2>Qué trae</h2>
-    <div class="features">
-      <div class="feature"><h3>Música y Voz</h3><p><em>Música</em> sube parejo sin tocar la dinámica: en 100% no cambia nada, a propósito, y se nota al subir. <em>Voz</em> comprime y levanta lo bajo, para llamadas, podcasts y video con audio flojo.</p></div>
-      <div class="feature"><h3>Ecualizador gráfico</h3><p>Cinco bandas de 60 Hz a 12 kHz, ±12 dB. Arrastrás los puntos sobre la curva real —la misma que suena—, con el espectro en vivo detrás y presets para empezar: Más graves, Voz clara, Noche…</p></div>
-      <div class="feature"><h3>Frecuencia de muestreo</h3><p>Pasá la salida de 44,1 a 48 o 96 kHz desde el menú, sin abrir Configuración de Audio MIDI, que casi nadie sabe que existe.</p></div>
-      <div class="feature"><h3>Sin clipping</h3><p>Un limitador con 3 ms de lookahead ve cada pico antes de que llegue. Subir los graves o la ganancia no rompe el sonido.</p></div>
-    </div>
-  </div>
-  <div data-lang="en">
-    <h2>What you get</h2>
-    <div class="features">
-      <div class="feature"><h3>Music and Voice</h3><p><em>Music</em> turns it up evenly with dynamics untouched: at 100% it changes nothing, on purpose, and you hear it as you go higher. <em>Voice</em> compresses and lifts the quiet parts, for calls, podcasts and video with weak audio.</p></div>
-      <div class="feature"><h3>Graphical equalizer</h3><p>Five bands from 60 Hz to 12 kHz, ±12 dB. Drag the points on the real response curve — the one you hear — with a live spectrum behind it and presets to start from: More bass, Clear voice, Night…</p></div>
-      <div class="feature"><h3>Sample rate</h3><p>Switch the output from 44.1 to 48 or 96 kHz from the menu, without opening Audio MIDI Setup, which few people know exists.</p></div>
-      <div class="feature"><h3>No clipping</h3><p>A limiter with 3 ms of lookahead sees every peak before it arrives. Boosting the bass or the gain does not break the sound.</p></div>
-    </div>
+  <h2>Qué trae</h2>
+  <div class="grid two">
+    <div class="card"><h3>Hasta 400 %</h3><p>Un slider de 50 a 400 %. Un limitador baja los picos antes de que lleguen, así el sonido no se rompe al subir.</p></div>
+    <div class="card"><h3>Música o Voz</h3><p><strong>Música</strong> sube parejo y respeta la dinámica. <strong>Voz</strong> levanta lo que se escucha bajo, ideal para llamadas, podcasts y videos con audio flojo.</p></div>
+    <div class="card"><h3>Ecualizador gráfico</h3><p>Graves, medios y agudos en cinco bandas que se arrastran sobre la curva, con el espectro en vivo y presets como Voz clara o Más graves.</p></div>
+    <div class="card"><h3>Sin drivers</h3><p>Usa la API de audio de macOS 14.2. No instala un dispositivo virtual ni cambia tu salida. Para desinstalarlo, borras la app.</p></div>
   </div>
 </div></section>
 
-<section><div class="wrap">
-  <div data-lang="es">
-    <h2>El limitador</h2>
-    <p>Multiplicar una señal por tres significa que todo lo que pasaba de un tercio de escala queda con las puntas cortadas, y una onda cortada es ese sonido fino y a lata del «volumen aumentado». Acá:</p>
-    <ol>
-      <li>La señal se retrasa 3 ms.</li>
-      <li>Se calcula la ganancia que cada frame necesitaría para no pasar el techo.</li>
-      <li>Una cola monótona mantiene el mínimo corrido de esas ganancias sobre toda la ventana.</li>
-      <li>El frame que sale ya viene multiplicado por la ganancia más baja que va a hacer falta.</li>
-    </ol>
-    <p>Desbordar es <strong>imposible por construcción</strong>, no por haber ajustado constantes hasta que se viera bien.</p>
+<section id="sin-distorsion"><div class="wrap">
+  <h2>Sube sin que suene reventado</h2>
+  <p>Hay dos maneras de evitar que el audio amplificado se pase del máximo. Una es recortar o redondear cada pico que se pasa: es simple, pero deforma la onda, y eso es el sonido a lata del «volumen aumentado». La otra es ver el pico unos milisegundos antes y bajar el volumen justo lo necesario. Subele hace lo segundo.</p>
+  <div class="chart">
+    <svg viewBox="0 0 640 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Distorsión a 400 % de volumen. Con la señal entrando a −12 dBFS: soft limiter por muestra 1,0 %, Subele 0,0004 %. A −6 dBFS: 23,2 % contra 0,0004 %. A 0 dBFS: 35,4 % contra 0,0004 %.">
+      <g stroke="rgba(255,255,255,.1)" stroke-width="1">
+        <line x1="150" y1="20" x2="150" y2="215"/><line x1="265" y1="20" x2="265" y2="215"/>
+        <line x1="380" y1="20" x2="380" y2="215"/><line x1="495" y1="20" x2="495" y2="215"/>
+        <line x1="610" y1="20" x2="610" y2="215"/>
+      </g>
+      <text x="150" y="235" text-anchor="middle">0 %</text><text x="265" y="235" text-anchor="middle">10 %</text>
+      <text x="380" y="235" text-anchor="middle">20 %</text><text x="495" y="235" text-anchor="middle">30 %</text>
+      <text x="610" y="235" text-anchor="middle">40 %</text>
+      <text class="lbl" x="0" y="52">Entra a −12 dBFS</text>
+      <rect x="150" y="34" width="11.5" height="16" rx="2" fill="#8eaee6"/><text class="val" x="168" y="47">1,0 %</text>
+      <rect x="150" y="54" width="2" height="16" rx="1" fill="#ffb020"/><text class="mine" x="160" y="67">0,0004 %</text>
+      <text class="lbl" x="0" y="117">Entra a −6 dBFS</text>
+      <rect x="150" y="99" width="266.8" height="16" rx="2" fill="#8eaee6"/><text class="val" x="424" y="112">23,2 %</text>
+      <rect x="150" y="119" width="2" height="16" rx="1" fill="#ffb020"/><text class="mine" x="160" y="132">0,0004 %</text>
+      <text class="lbl" x="0" y="182">Entra a 0 dBFS</text>
+      <rect x="150" y="164" width="407.1" height="16" rx="2" fill="#8eaee6"/><text class="val" x="565" y="177">35,4 %</text>
+      <rect x="150" y="184" width="2" height="16" rx="1" fill="#ffb020"/><text class="mine" x="160" y="197">0,0004 %</text>
+    </svg>
   </div>
-  <div data-lang="en">
-    <h2>The limiter</h2>
-    <p>Multiplying a signal by three means everything above a third of full scale gets its tops shorn off, and sheared waveforms are that thin, tinny "boosted" sound. Here:</p>
-    <ol>
-      <li>The signal is delayed by 3 ms.</li>
-      <li>The gain each frame would need to stay under the ceiling is computed.</li>
-      <li>A monotonic queue keeps the running minimum of those gains across the window.</li>
-      <li>The frame leaving the delay is already multiplied by the lowest gain that will be needed.</li>
-    </ol>
-    <p>Overshoot is <strong>impossible by construction</strong>, not by tuning constants until it looks fine.</p>
-  </div>
+  <p class="note">Distorsión armónica total de un seno de 1 kHz con el volumen en 400 %. En azul, un <em>soft limiter</em> por muestra, calculado con la fórmula que publica FineTune en su código; en ámbar, Subele, medido con su procesador real (es un test del repositorio). Es una señal de prueba. Con música la diferencia cambia, y todavía falta medir las apps grabando su salida (por confirmar). <a href="https://github.com/carlostapiacl/subele/tree/main/experimentos/2026-10-22-distorsion-frente-a-finetune">La prueba completa</a> está en el repo.</p>
+  <p>El limitador además mira los picos <strong>entre</strong> muestras, que son los que el conversor del Mac puede reconstruir por encima del máximo aunque cada muestra esté por debajo.</p>
 </div></section>
 
 <section><div class="wrap">
-  <div data-lang="es">
-    <h2>Latencia</h2>
-    <p>Medida sobre los timestamps del propio callback de audio, no estimada. La cadena cuesta unos dos períodos de buffer más los 3 ms de lookahead.</p>
-    <table>
-      <tr><th>Buffer</th><th>Latencia agregada</th></tr>
-      <tr><td>128 frames</td><td>8,8 ms</td></tr>
-      <tr class="hi"><td>256 frames (por defecto)</td><td>14,6 ms</td></tr>
-      <tr><td>512 frames</td><td>26,2 ms</td></tr>
-    </table>
-    <p class="muted">A la música no le importa en ninguno de los tres. Al video puede que sí, y por eso el default no es el que elige macOS solo.</p>
-  </div>
-  <div data-lang="en">
-    <h2>Latency</h2>
-    <p>Measured from the audio callback's own timestamps, not estimated. The chain costs about two buffer periods plus the 3 ms lookahead.</p>
-    <table>
-      <tr><th>Buffer</th><th>Added latency</th></tr>
-      <tr><td>128 frames</td><td>8.8 ms</td></tr>
-      <tr class="hi"><td>256 frames (default)</td><td>14.6 ms</td></tr>
-      <tr><td>512 frames</td><td>26.2 ms</td></tr>
-    </table>
-    <p class="muted">Music will not care at any of these. Video might, which is why the default is not what macOS picks on its own.</p>
-  </div>
-</div></section>
-
-<section><div class="wrap">
-  <div data-lang="es">
-    <h2>Código abierto, y acá importa más que de costumbre</h2>
-    <p>Esta app <strong>captura todo el audio de tu sistema</strong>. Es lo que tiene que hacer para funcionar, pero significa que te está pidiendo un permiso enorme. No deberías dárselo a un binario que no podés leer.</p>
-    <p>Todo el código está publicado bajo licencia MIT: el motor de audio, el procesamiento, la interfaz, el script que arma la app e incluso el que dibuja el ícono. Podés leer exactamente qué hace con el audio y comprobar que no sale de tu máquina — no hay servidor, no hay cuenta, no hay telemetría, no hay red.</p>
-    <p>Y si preferís no confiar en el <code>.dmg</code> que yo publiqué, <a href="#instalacion">compilalo vos</a> desde el mismo código. Sale idéntico.</p>
-    <p><a class="btn ghost" href="https://github.com/carlostapiacl/subele">Ver el código en GitHub</a></p>
-  </div>
-  <div data-lang="en">
-    <h2>Open source, and here it matters more than usual</h2>
-    <p>This app <strong>captures all of your system audio</strong>. That is what it has to do in order to work, but it means it is asking you for an enormous permission. You should not grant that to a binary you cannot read.</p>
-    <p>All of the code is published under the MIT licence: the audio engine, the processing, the interface, the script that assembles the app, even the one that draws the icon. You can read exactly what it does with your audio and confirm that none of it leaves your machine — there is no server, no account, no telemetry, no network.</p>
-    <p>And if you would rather not trust the <code>.dmg</code> I published, <a href="#instalacion">build it yourself</a> from the same source. It comes out identical.</p>
-    <p><a class="btn ghost" href="https://github.com/carlostapiacl/subele">View the source on GitHub</a></p>
-  </div>
+  <h2>Subele frente a FineTune y eqMac</h2>
+  <p>Las tres suben el volumen y cada una apunta a algo distinto.</p>
+  <div class="table"><table>
+    <tr><th></th><th>Subele</th><th>FineTune</th><th>eqMac</th></tr>
+    <tr><td>Instala un driver de audio</td><td class="win">No</td><td>No</td><td>Sí</td></tr>
+    <tr><td>Precio</td><td class="win">Gratis</td><td>Gratis</td><td>Gratis, con plan Pro</td></tr>
+    <tr><td>Cómo evita pasarse del máximo</td><td class="win">Baja el volumen con anticipación, incluye picos entre muestras</td><td>Redondea cada muestra que se pasa</td><td>(por confirmar)</td></tr>
+    <tr><td>macOS mínimo</td><td class="win">14.2 Sonoma</td><td>15 Sequoia</td><td>(por confirmar)</td></tr>
+    <tr><td>Interfaz en español</td><td class="win">Sí</td><td>No</td><td>(por confirmar)</td></tr>
+    <tr><td>Volumen distinto por app</td><td>No</td><td class="win">Sí</td><td>En el plan Pro</td></tr>
+    <tr><td>Ecualizador</td><td>5 bandas</td><td class="win">10 bandas, perfiles de audífonos</td><td>10 bandas</td></tr>
+    <tr><td>Instalación</td><td>.dmg sin notarizar</td><td class="win">Homebrew</td><td>Instalador con driver</td></tr>
+  </table></div>
+  <p class="muted">Si necesitas volumen por app, ruteo a varias salidas o perfiles de audífonos, te conviene FineTune. Subele está hecho para subir todo el sonido del Mac sin que se rompa.</p>
 </div></section>
 
 <section id="instalacion"><div class="wrap">
-  <div data-lang="es">
-    <h2>Instalación</h2>
-    <p>Abrí el <code>.dmg</code> y arrastrá Subele a Aplicaciones.</p>
-    <div class="note">
-      <h3>macOS la va a bloquear la primera vez</h3>
-      <p>La app está firmada pero <strong>no notarizada</strong>: notarizar exige una cuenta de Apple Developer paga. Vas a ver «Apple no pudo verificar que esté libre de malware». Para destrabarla:</p>
-      <p><strong>Ajustes del Sistema → Privacidad y seguridad</strong>, bajá hasta el aviso y tocá <strong>Abrir igualmente</strong>. O en la Terminal:</p>
-      <pre><code>xattr -d com.apple.quarantine "/Applications/Subele.app"</code></pre>
-      <p class="muted" style="margin-bottom:0">En macOS 15 el viejo Control-clic → Abrir ya no alcanza.</p>
-    </div>
-    <p>Si preferís no confiar en un binario sin notarizar —razonable—, compilala vos. No necesita Xcode:</p>
-    <pre><code>git clone https://github.com/carlostapiacl/subele
+  <h2>Cómo se instala</h2>
+  <ol class="steps">
+    <li><a href="https://github.com/carlostapiacl/subele/releases/latest/download/Subele.dmg">Descarga Subele.dmg</a>, ábrelo y arrastra Subele a Aplicaciones.</li>
+    <li>Abre Subele. La primera vez macOS la va a bloquear; más abajo está cómo abrirla.</li>
+    <li>Cuando lo pida, dale permiso de <strong>Grabación de audio</strong>. Es lo que le deja leer el sonido del sistema para subirlo.</li>
+    <li>Busca el ícono en la barra de menú y mueve el slider.</li>
+  </ol>
+  <div class="warn">
+    <h3>Por qué macOS la bloquea</h3>
+    <p>La app está firmada pero <strong>no notarizada</strong>: notarizar exige una cuenta paga de Apple Developer. Vas a ver «Apple no pudo verificar que esté libre de malware». Para abrirla igual:</p>
+    <p><strong>Ajustes del Sistema → Privacidad y seguridad</strong>, baja hasta el aviso sobre Subele y toca <strong>Abrir igualmente</strong>. O en la Terminal:</p>
+    <pre><code>xattr -d com.apple.quarantine "/Applications/Subele.app"</code></pre>
+    <p class="muted" style="margin:0">En macOS 15 el viejo Control-clic → Abrir ya no alcanza.</p>
+  </div>
+  <h3>Comprobar que el .dmg es el código publicado</h3>
+  <p>El .dmg lo compila GitHub desde el código público, con una atestación que lo ata a ese código. Con <code>gh</code> instalado:</p>
+  <pre><code>gh attestation verify Subele.dmg --repo carlostapiacl/subele</code></pre>
+  <p>Si prefieres no confiar en ningún binario, puedes compilarla tú. No hace falta Xcode:</p>
+  <pre><code>git clone https://github.com/carlostapiacl/subele
 cd subele
 ./build-app.sh</code></pre>
-  </div>
-  <div data-lang="en">
-    <h2>Install</h2>
-    <p>Open the <code>.dmg</code> and drag Subele to Applications.</p>
-    <div class="note">
-      <h3>macOS will block it the first time</h3>
-      <p>The app is signed but <strong>not notarised</strong> — notarisation requires a paid Apple Developer account. You will see "Apple could not verify this app is free of malware". To get past it:</p>
-      <p><strong>System Settings → Privacy &amp; Security</strong>, scroll to the notice and click <strong>Open Anyway</strong>. Or in Terminal:</p>
-      <pre><code>xattr -d com.apple.quarantine "/Applications/Subele.app"</code></pre>
-      <p class="muted" style="margin-bottom:0">On macOS 15 the old Control-click → Open trick is no longer enough.</p>
-    </div>
-    <p>If you would rather not trust an un-notarised binary — fair — build it yourself. No Xcode needed:</p>
-    <pre><code>git clone https://github.com/carlostapiacl/subele
-cd subele
-./build-app.sh</code></pre>
-  </div>
 </div></section>
 
 <section><div class="wrap">
-  <div data-lang="es">
-    <h2>Apoyar</h2>
-    <p>Subele es gratis y va a seguir siéndolo. No tiene versión paga, ni cuenta, ni nada guardado para después.</p>
-    <p>Si te resultó útil y querés colaborar, se agradece — y si no, usala igual, para eso está. El enlace también está en la app, en <strong>Apoyar Subele…</strong>.</p>
-    <p><a class="btn" href="https://paypal.me/carlostapiacl">Donar por PayPal</a></p>
-  </div>
-  <div data-lang="en">
-    <h2>Support</h2>
-    <p>Subele is free and will stay that way. There is no paid tier, no account, nothing held back for later.</p>
-    <p>If you found it useful and want to chip in, it is appreciated — and if not, use it anyway, that is what it is for. The link is in the app too, under <strong>Support Subele…</strong>.</p>
-    <p><a class="btn" href="https://paypal.me/carlostapiacl">Donate with PayPal</a></p>
-  </div>
+  <h2>Preguntas frecuentes</h2>
+  <details><summary>¿Por qué pide permiso para grabar audio?</summary>
+    <p>Para subir el volumen tiene que leer el sonido que sale del Mac, procesarlo y devolverlo. Ese permiso es el que macOS usa para eso. El audio no sale de tu Mac. La app no tiene servidor, cuenta ni telemetría, y el código es público.</p></details>
+  <details><summary>¿Funciona con audífonos o parlantes Bluetooth?</summary>
+    <p>Sí. Trabaja sobre la salida que tengas elegida en macOS y se rearma sola si la cambias. Con parlantes AirPlay todavía no está probado (por confirmar).</p></details>
+  <details><summary>¿Agrega retraso?</summary>
+    <p>Unos 15 ms con la opción por defecto, medidos desde el propio audio. No se nota en música ni en llamadas. Si lo notas en un video, en el menú Latencia hay una opción de 128 frames, de unos 9 ms.</p></details>
+  <details><summary>¿Gasta mucha batería?</summary>
+    <p>Muy poca. En un MacBook Pro Intel de 2019, con música sonando, usó cerca de 1 % de CPU. En Apple Silicon debería ser menos (por confirmar).</p></details>
+  <details><summary>¿Funciona si tengo eqMac o Boom 3D abiertos?</summary>
+    <p>No. Esas apps instalan su propio driver y se ponen como salida del sistema, y Subele se traba al intentar leerla. Ciérralas antes de abrir Subele.</p></details>
+  <details><summary>¿Cómo lo desinstalo?</summary>
+    <p>Ciérralo desde su menú y borra Subele de Aplicaciones. No deja drivers ni nada instalado en el sistema.</p></details>
 </div></section>
 
-<footer>
-  <p>
-    MIT · <a href="https://github.com/carlostapiacl/subele">GitHub</a> ·
-    <span data-lang="es">hecho por</span><span data-lang="en">built by</span>
-    <a href="https://carlostapia.cl">Carlos Tapia</a>
-  </p>
-</footer>
+<section><div class="wrap">
+  <h2>Cómo funciona por dentro</h2>
+  <p>Desde macOS 14.2 hay una API pública, <code>AudioHardwareCreateProcessTap</code>, que captura lo que suenan las demás apps sin un driver de por medio. Subele captura ese audio, lo pasa por ganancia, ecualizador, compresor (en modo Voz) y un limitador con 3 ms de anticipación, y lo devuelve al mismo parlante. Tu salida por defecto no cambia.</p>
+  <p>Todos los detalles, las mediciones y los tests están en el <a href="https://github.com/carlostapiacl/subele">README del repositorio</a>.</p>
+</div></section>
 
-<script>
-  function setLang(lang) {
-    document.documentElement.lang = lang;
-    document.querySelectorAll('[data-lang]').forEach(function (el) {
-      el.classList.toggle('on', el.dataset.lang === lang);
-    });
-    document.getElementById('btn-es').setAttribute('aria-pressed', lang === 'es');
-    document.getElementById('btn-en').setAttribute('aria-pressed', lang === 'en');
-    try { localStorage.setItem('lang', lang); } catch (e) {}
-  }
-  var saved = null;
-  try { saved = localStorage.getItem('lang'); } catch (e) {}
-  setLang(saved || ((navigator.language || 'en').startsWith('es') ? 'es' : 'en'));
-</script>
+<section><div class="wrap">
+  <h2>Apoyar el proyecto</h2>
+  <p>Subele es gratis y va a seguir siéndolo. No hay versión paga. Si te sirvió y quieres colaborar, se agradece; si no, úsala igual.</p>
+  <p><a class="btn ghost" href="https://paypal.me/carlostapiacl">Donar por PayPal</a></p>
+</div></section>
+
+<footer><div class="wrap">
+  <p>MIT · <a href="https://github.com/carlostapiacl/subele">GitHub</a> · hecho por <a href="https://carlostapia.cl">Carlos Tapia</a></p>
+  <p>Esta página cuenta visitas con Plausible, sin cookies ni datos personales. La app no envía nada.</p>
+</div></footer>
+
 </body>
 </html>

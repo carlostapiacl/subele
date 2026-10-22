@@ -43,8 +43,13 @@ jobs:
           ./build-app.sh
           ./Tools/make-dmg.sh
 
-      - name: Checksums
-        run: cd dist && shasum -a 256 *.dmg | tee SHA256SUMS.txt
+      # Una copia con nombre fijo, para que el sitio enlace siempre a
+      # releases/latest/download/Subele.dmg sin conocer la versión.
+      - name: Nombre estable y checksums
+        run: |
+          cd dist
+          cp "subele-${GITHUB_REF_NAME#v}.dmg" Subele.dmg
+          shasum -a 256 *.dmg | tee SHA256SUMS.txt
 
       - name: Atestación de procedencia
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
@@ -81,7 +86,7 @@ jobs:
             --notes-file - <<'NOTES'
           ## Instalación
 
-          Descargá el `.dmg`, abrilo y arrastrá **Subele** a Aplicaciones.
+          Descarga el `.dmg`, ábrelo y arrastra **Subele** a Aplicaciones.
 
           ### Verificar que el .dmg es este código
 
@@ -98,21 +103,21 @@ jobs:
 
           ### La primera vez macOS la va a bloquear
 
-          La app está firmada ad-hoc pero **no notarizada** — notarizar exige una
+          La app está firmada ad-hoc pero **no notarizada**. Notarizar exige una
           cuenta de Apple Developer de pago. Al abrirla vas a ver *"Apple no pudo
           verificar que esté libre de malware"*.
 
           Para destrabarla, una de estas dos:
 
-          - **Ajustes del Sistema → Privacidad y seguridad**, bajá hasta el aviso
-            sobre Subele y tocá **Abrir igualmente**.
+          - **Ajustes del Sistema → Privacidad y seguridad**, baja hasta el aviso
+            sobre Subele y toca **Abrir igualmente**.
           - O en la Terminal:
             ```
             xattr -d com.apple.quarantine "/Applications/Subele.app"
             ```
 
-          Si preferís no confiar en un binario sin notarizar —razonable—, compilala
-          vos: `./build-app.sh`. Son unos segundos y no necesita Xcode.
+          Si prefieres no confiar en un binario sin notarizar, compílala tú
+          con `./build-app.sh`. Son unos segundos y no necesita Xcode.
 
           ---
 
@@ -130,7 +135,7 @@ jobs:
           **Open Anyway**, or run
           `xattr -d com.apple.quarantine "/Applications/Subele.app"`.
 
-          Or build it yourself with `./build-app.sh` — it takes seconds and needs no
+          Or build it yourself with `./build-app.sh`. It takes seconds and needs no
           Xcode.
           </details>
           NOTES
