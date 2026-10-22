@@ -265,7 +265,7 @@ gh attestation verify subele-*.dmg --repo carlostapiacl/subele
 ```
 
 No reemplaza la notarización de Apple, pero deja comprobar que el `.dmg` salió de
-este código. Las Actions del workflow van fijadas por SHA y cada job tiene solo
+este código. La 0.2.2 se compiló a mano y no tiene atestación; sí tiene SHA-256. Las Actions del workflow van fijadas por SHA y cada job tiene solo
 los permisos que usa.
 
 El ícono se genera por código en `Tools/make-icon.swift`, así que se revisa en

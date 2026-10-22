@@ -147,9 +147,9 @@
     <pre><code>xattr -d com.apple.quarantine "/Applications/Subele.app"</code></pre>
     <p class="muted" style="margin:0">En macOS 15 el viejo Control-clic → Abrir ya no alcanza.</p>
   </div>
-  <h3>Comprobar que el .dmg es el código publicado</h3>
-  <p>El .dmg lo compila GitHub desde el código público, con una atestación que lo ata a ese código. Con <code>gh</code> instalado:</p>
-  <pre><code>gh attestation verify Subele.dmg --repo carlostapiacl/subele</code></pre>
+  <h3>Comprobar el .dmg</h3>
+  <p>Cada versión publica el SHA-256 de sus archivos en <code>SHA256SUMS.txt</code>, en la <a href="https://github.com/carlostapiacl/subele/releases/latest">página de la versión</a>. Para compararlo con el que descargaste:</p>
+  <pre><code>shasum -a 256 ~/Downloads/Subele.dmg</code></pre>
   <p>Si prefieres no confiar en ningún binario, puedes compilarla tú. No hace falta Xcode:</p>
   <pre><code>git clone https://github.com/carlostapiacl/subele
 cd subele
