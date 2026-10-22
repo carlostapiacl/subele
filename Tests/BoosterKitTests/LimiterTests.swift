@@ -74,4 +74,26 @@ struct LimiterTests {
         // Y no se pasa de largo: baja lo necesario, no mucho más.
         #expect(linearToDecibels(truePeak) > ceilingDecibels - 0.6)
     }
+
+    @Test("a 400% baja la ganancia sin deformar la onda", arguments: [Float(-12), -6, 0])
+    func boostingDoesNotDistort(input: Float) {
+        // La diferencia con un soft clipper por muestra: ese reforma cada pico y
+        // agrega armónicos (decenas de % con esta misma señal). Acá la ganancia
+        // baja entera con lookahead y la onda queda con su forma.
+        let processor = makeProcessor(gain: 4, mode: .transparent)
+        let output = render(processor, sine(decibels: input, frames: 48_000, channels: 2,
+                                            frequency: 1_000),
+                            channels: 2)
+        let distortion = totalHarmonicDistortion(output, channels: 2, frequency: 1_000)
+        #expect(distortion < 0.1, "THD \(distortion)%")
+    }
+
+    @Test("el medidor de distorsión ve un recorte cuando lo hay")
+    func distortionMeterSeesClipping() {
+        // Control del test anterior: sin esto, un medidor roto que siempre diera
+        // cero lo haría pasar.
+        let clipped = sine(decibels: 6, frames: 48_000, channels: 2, frequency: 1_000)
+            .map { max(-1, min(1, $0)) }
+        #expect(totalHarmonicDistortion(clipped, channels: 2, frequency: 1_000) > 5)
+    }
 }
