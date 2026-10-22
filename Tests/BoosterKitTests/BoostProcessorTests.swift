@@ -81,4 +81,29 @@ struct BoostProcessorTests {
         let output = render(processor, [Float](repeating: 0, count: 9_600), channels: 2)
         #expect(peak(output) == 0)
     }
+
+    @Test("un cambio brusco de ganancia se hace en rampa, sin escalón")
+    func gainChangesAreSmoothed() {
+        // Continua constante, bien bajo el techo: cualquier salto en la salida es
+        // la ganancia saltando.
+        let channels = 2
+        let processor = makeProcessor(gain: 1, mode: .transparent)
+        let before = render(processor, [Float](repeating: 0.05, count: 9_600 * channels),
+                            channels: channels)
+        processor.gain = 4
+        let after = render(processor, [Float](repeating: 0.05, count: 9_600 * channels),
+                           channels: channels)
+        let joined = before + after
+        var largestStep: Float = 0
+        // Desde la mitad del primer tramo: al principio la línea de retardo del
+        // limitador sale en cero y el primer frame real es un salto que no es de
+        // la ganancia.
+        for index in stride(from: before.count / 2, to: joined.count, by: channels) {
+            largestStep = max(largestStep, abs(joined[index] - joined[index - channels]))
+        }
+        // Sin rampa el salto sería de 0,15 en una muestra.
+        #expect(largestStep < 0.005)
+        // Y llega: al final la ganancia es exacta.
+        #expect(abs(after[after.count - 1] - 0.2) < 1e-4)
+    }
 }

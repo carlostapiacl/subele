@@ -49,4 +49,29 @@ struct LimiterTests {
                             channels: 2)
         #expect(peak(output) < 0.999)
     }
+
+    @Test("los picos entre muestras también se limitan (true peak)")
+    func limitsInterSamplePeaks() {
+        // El caso de libro: un seno a fs/4 con fase de 45°. Cada muestra cae en
+        // ±0,707 del pico real, así que un limitador que solo mira muestras lo
+        // deja pasar entero —las muestras están a −3 dBFS— mientras el conversor
+        // reconstruye una onda que llega a 0 dBFS.
+        let channels = 2
+        let frames = 48_000
+        var input = [Float](repeating: 0, count: frames * channels)
+        for frame in 0..<frames {
+            let value = sinf(Float.pi / 2 * Float(frame) + Float.pi / 4)
+            for channel in 0..<channels { input[frame * channels + channel] = value }
+        }
+        let output = render(makeProcessor(gain: 1, mode: .transparent), input, channels: channels)
+
+        // A fs/4 dos muestras seguidas están en cuadratura: el pico real del seno
+        // es la raíz de la suma de sus cuadrados.
+        let last = output.count - channels * 2
+        let truePeak = sqrtf(output[last] * output[last]
+                             + output[last + channels] * output[last + channels])
+        #expect(linearToDecibels(truePeak) <= ceilingDecibels + 0.1)
+        // Y no se pasa de largo: baja lo necesario, no mucho más.
+        #expect(linearToDecibels(truePeak) > ceilingDecibels - 0.6)
+    }
 }
