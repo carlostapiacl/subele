@@ -96,6 +96,19 @@ public final class Equalizer {
         generation.increment()
     }
 
+    /// Cambia todas las bandas de una vez, como hace un preset. Las ganancias se
+    /// escriben primero y la generación se publica una sola vez al final: el hilo
+    /// de audio no recalcula hasta ver la generación nueva, así que no procesa
+    /// medio preset viejo y medio nuevo.
+    public func setGains(_ decibels: [Float]) {
+        let limit = Equalizer.maximumGainDecibels
+        for band in 0..<min(decibels.count, Equalizer.bandCount) {
+            let value = decibels[band].isFinite ? min(max(decibels[band], -limit), limit) : 0
+            ca_store_float(gains + band, value)
+        }
+        generation.increment()
+    }
+
     public var isFlat: Bool {
         (0..<Equalizer.bandCount).allSatisfy { gain(ofBand: $0) == 0 }
     }
