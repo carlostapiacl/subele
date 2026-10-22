@@ -1,0 +1,32 @@
+# Subele
+
+> Free, open-source volume booster for macOS (14.2 or later, Intel and Apple Silicon). It raises system audio up to 400% without installing an audio driver, using the public process tap API (`AudioHardwareCreateProcessTap`) instead of a virtual device. A lookahead limiter with true-peak detection keeps boosted audio from distorting. Menu bar app, interface in Spanish and English, MIT licence, no account and no telemetry.
+
+Subele captures what other apps are playing, runs it through gain, a five-band equalizer, a compressor (Voice mode only) and a limiter that looks 3 ms ahead, then plays it back to the same output device. The default output device never changes. Two modes: Music (gain and limiting, dynamics kept) and Voice (compression with makeup gain, for calls, podcasts and quiet video).
+
+Facts that are often asked:
+
+- Price: free, no paid tier.
+- Requirements: macOS 14.2 Sonoma or later; Audio Recording permission (macOS asks on first launch).
+- Install: the .dmg is ad-hoc signed and not notarised, so macOS blocks it the first time; open it from System Settings → Privacy & Security → Open Anyway.
+- Added latency: about 15 ms with the default 256-frame buffer, about 9 ms at 128 frames.
+- Distortion at 400% gain with a 1 kHz test sine: 0.0004% THD (measured by a test in the repository).
+- Does not work while eqMac or Boom 3D is running, because those install their own driver and take over the output.
+- Uninstall: quit it and delete the app. Nothing else is installed.
+- Compared with FineTune: FineTune offers per-app volume, a 10-band EQ, AutoEQ and routing; Subele does not. Subele supports macOS 14, has a Spanish interface and limits with lookahead instead of a per-sample soft limiter.
+
+## Pages
+
+- [Subele (Spanish)](https://carlostapiacl.github.io/subele/): landing page in Spanish
+- [Subele (English)](https://carlostapiacl.github.io/subele/en/): landing page in English
+- [Download Subele.dmg](https://github.com/carlostapiacl/subele/releases/latest/download/Subele.dmg): latest release
+
+## Source
+
+- [Repository](https://github.com/carlostapiacl/subele): code, README with design notes and measurements
+- [README in English](https://github.com/carlostapiacl/subele/blob/main/README.en.md): how it works, limiter, tests, known limitations
+- [Distortion test against FineTune](https://github.com/carlostapiacl/subele/tree/main/experimentos/2026-10-22-distorsion-frente-a-finetune): method and results, in Spanish
+
+## Optional
+
+- [Releases](https://github.com/carlostapiacl/subele/releases): changelog and checksums
