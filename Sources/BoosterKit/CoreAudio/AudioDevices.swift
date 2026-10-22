@@ -94,26 +94,36 @@ public enum AudioDevices {
         return rates.sorted()
     }
 
+    // MARK: Streams
+
+    /// Canales de cada buffer de un lado del dispositivo, en el orden en que
+    /// llegan al IOProc. Vacío si ese lado no tiene streams o no se puede leer.
+    public static func streamLayout(of device: AudioObjectID,
+                                    scope: AudioObjectPropertyScope) -> [Int] {
+        var address = AudioObject.address(kAudioDevicePropertyStreamConfiguration, scope: scope)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(device, &address, 0, nil, &size) == noErr,
+              size >= UInt32(MemoryLayout<AudioBufferList>.size) else { return [] }
+        let raw = UnsafeMutableRawPointer.allocate(
+            byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { raw.deallocate() }
+        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, raw) == noErr
+        else { return [] }
+        let list = UnsafeMutableAudioBufferListPointer(
+            raw.assumingMemoryBound(to: AudioBufferList.self))
+        return list.map { Int($0.mNumberChannels) }
+    }
+
     // MARK: Observadores
 
-    /// Llama a `handler` en la cola principal cada vez que cambia el dispositivo de
-    /// salida por defecto. Devuelve un token que quita el listener al soltarse.
-    public static func observeDefaultOutput(_ handler: @escaping () -> Void) -> Any? {
-        observe(AudioObject.system, kAudioHardwarePropertyDefaultOutputDevice, handler)
-    }
-
-    /// Llama a `handler` en la cola principal cada vez que cambia la frecuencia de
-    /// muestreo del dispositivo, se cambie desde acá o desde Configuración de
-    /// Audio MIDI.
-    public static func observeSampleRate(of device: AudioObjectID,
-                                         _ handler: @escaping () -> Void) -> Any? {
-        observe(device, kAudioDevicePropertyNominalSampleRate, handler)
-    }
-
-    private static func observe(_ object: AudioObjectID,
-                                _ selector: AudioObjectPropertySelector,
-                                _ handler: @escaping () -> Void) -> Any? {
-        var address = AudioObject.address(selector)
+    /// Llama a `handler` en la cola principal cada vez que cambia la propiedad.
+    /// Devuelve un token que quita el listener al soltarse, o nil si CoreAudio no
+    /// aceptó el listener.
+    public static func observe(_ object: AudioObjectID,
+                               _ selector: AudioObjectPropertySelector,
+                               scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal,
+                               _ handler: @escaping () -> Void) -> AnyObject? {
+        var address = AudioObject.address(selector, scope: scope)
         let block: AudioObjectPropertyListenerBlock = { _, _ in handler() }
         let status = AudioObjectAddPropertyListenerBlock(
             object, &address, DispatchQueue.main, block)

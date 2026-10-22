@@ -63,6 +63,7 @@ struct Strings {
     let sampleRateMenu: String
     let sampleRateUnavailable: String
     let sampleRateFailed: String
+    let sampleRateSystemWide: String
     let equalizerMenu: String
     let equalizerHint: String
     let presetFlat: String
@@ -79,6 +80,8 @@ struct Strings {
     let loudnessHint: String
     let notRunning: String
     let starting: String
+    let stopping: String
+    let coreAudioStuck: String
     let disabled: String
     let passthrough: String
     let silent: String
@@ -94,7 +97,7 @@ struct Strings {
     let modeLabel: String
     let framesPerCallback: String
     let commandsHelp: String
-    let stopping: String
+    let consoleStopping: String
     let couldNotStart: String
     let startupHint: String
     let deviceChanged: String
@@ -130,6 +133,7 @@ struct Strings {
         sampleRateMenu: "Sample Rate",
         sampleRateUnavailable: "Not available for this device",
         sampleRateFailed: "Could not change it",
+        sampleRateSystemWide: "Applies to the whole Mac, not just Subele",
         equalizerMenu: "Equalizer",
         equalizerHint: "Drag a point · double-click resets it",
         presetFlat: "Flat",
@@ -145,6 +149,8 @@ struct Strings {
         loudnessHint: "Lifts quiet parts. For speech, calls and video.",
         notRunning: "Not running",
         starting: "Starting…",
+        stopping: "Stopping…",
+        coreAudioStuck: "CoreAudio is not responding. Another audio driver?",
         disabled: "Disabled",
         passthrough: "Audio passes through untouched",
         silent: "silent",
@@ -162,7 +168,7 @@ struct Strings {
           Commands:  50-400 = gain %  ·  m = music  ·  v = voice
                      d = latency  ·  s = status  ·  q = quit
         """,
-        stopping: "Stopping…",
+        consoleStopping: "Stopping…",
         couldNotStart: "Could not start",
         startupHint: """
 
@@ -170,7 +176,7 @@ struct Strings {
               · eqMac, Boom 3D or another driver-based booster is running and owns
                 the default output device. Ours then taps their virtual device,
                 which is itself passing audio through, and the two deadlock.
-                Quit it:  pkill -f eqMac.app
+                Quit it from its menu bar icon, or in Terminal:  killall eqMac
               · Audio capture permission is missing: System Settings → Privacy &
                 Security → Audio Recording.
 
@@ -215,8 +221,9 @@ struct Strings {
         sampleRateMenu: "Frecuencia de muestreo",
         sampleRateUnavailable: "No disponible en este dispositivo",
         sampleRateFailed: "No se pudo cambiar",
+        sampleRateSystemWide: "Vale para todo el Mac, no solo para Subele",
         equalizerMenu: "Ecualizador",
-        equalizerHint: "Arrastrá un punto · doble clic lo vuelve a cero",
+        equalizerHint: "Arrastra un punto · doble clic lo vuelve a cero",
         presetFlat: "Plano",
         presetBass: "Más graves",
         presetVoice: "Voz clara",
@@ -230,6 +237,8 @@ struct Strings {
         loudnessHint: "Sube lo bajo. Para voz, llamadas y video.",
         notRunning: "No está corriendo",
         starting: "Arrancando…",
+        stopping: "Deteniendo…",
+        coreAudioStuck: "CoreAudio no responde. ¿Otro driver de audio?",
         disabled: "Desactivado",
         passthrough: "El audio pasa sin tocar",
         silent: "silencio",
@@ -247,7 +256,7 @@ struct Strings {
           Comandos:  50-400 = ganancia %  ·  m = música  ·  v = voz
                      d = latencia  ·  s = estado  ·  q = salir
         """,
-        stopping: "Cerrando…",
+        consoleStopping: "Cerrando…",
         couldNotStart: "No se pudo arrancar",
         startupHint: """
 
@@ -255,7 +264,8 @@ struct Strings {
               · eqMac, Boom 3D u otro booster con driver está corriendo y es dueño
                 de la salida por defecto. Entonces tapeamos su dispositivo virtual,
                 que a su vez está pasando audio, y los dos se traban.
-                Cerralo:  pkill -f eqMac.app
+                Ciérralo desde su ícono en la barra de menú, o en la Terminal:
+                killall eqMac
               · Falta permiso de captura de audio: Ajustes del Sistema → Privacidad
                 y seguridad → Grabación de audio.
 

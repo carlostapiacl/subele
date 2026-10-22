@@ -1,0 +1,117 @@
+/* Subele — estilos compartidos por / (español) y /en/ (inglés).
+   Un solo tema, oscuro, a propósito: es el mismo mundo visual que el ícono y
+   el menú de la app. El ámbar es el color del limitador trabajando. */
+:root {
+  --ink: #0d0b24;
+  --ink-2: #171440;
+  --panel: rgba(255, 255, 255, .045);
+  --indigo: #7a86ff;
+  --amber: #ffb020;
+  --text: #e8e7f5;
+  --muted: #a3a0c6;
+  --line: rgba(255, 255, 255, .1);
+  --rival: #8eaee6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--indigo); }
+a:focus-visible, .btn:focus-visible, summary:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+.wrap {
+  max-width: 760px; margin: 0 auto;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+h1, h2, h3 { text-wrap: balance; letter-spacing: -.02em; line-height: 1.15; }
+h1 { font-size: clamp(32px, 6.4vw, 52px); margin: 0 0 16px; }
+h2 { font-size: clamp(24px, 4vw, 30px); margin: 0 0 16px; }
+h3 { font-size: 18px; margin: 0 0 6px; }
+p { margin: 0 0 16px; }
+.muted { color: var(--muted); }
+code {
+  font: 14px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  background: rgba(255, 255, 255, .08); padding: 2px 6px; border-radius: 5px;
+}
+pre {
+  background: rgba(0, 0, 0, .35); border: 1px solid var(--line);
+  border-radius: 10px; padding: 14px 16px; overflow-x: auto; margin: 0 0 16px;
+}
+pre code { background: none; padding: 0; }
+
+/* Barra superior: marca a la izquierda, idioma a la derecha. */
+.top { display: flex; justify-content: space-between; align-items: center; padding-block: 18px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); text-decoration: none; }
+.brand img { width: 28px; height: 28px; border-radius: 7px; }
+.lang { font-size: 14px; font-weight: 600; color: var(--muted); text-decoration: none; border: 1px solid var(--line); border-radius: 8px; padding: 5px 11px; }
+.lang:hover { color: var(--text); }
+
+/* Hero: el problema primero, un solo botón principal. */
+header.hero {
+  padding-block: 28px 56px;
+  background:
+    radial-gradient(80% 110% at 50% -25%, rgba(122, 134, 255, .28), transparent 62%),
+    linear-gradient(180deg, var(--ink-2), var(--ink));
+  border-bottom: 1px solid var(--line);
+}
+.hero .ask { color: var(--amber); font-weight: 600; margin: 40px 0 12px; }
+.hero .sub { color: var(--muted); font-size: 19px; max-width: 34em; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 28px 0 16px; }
+.btn {
+  display: inline-block; padding: 14px 26px; border-radius: 11px;
+  font-weight: 650; font-size: 17px; text-decoration: none;
+  background: var(--amber); color: #1b1400;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+.req { color: var(--muted); font-size: 14.5px; margin: 0; }
+
+section { padding-block: 56px; border-bottom: 1px solid var(--line); }
+.shot { text-align: center; padding-block: 44px 20px; }
+.shot img { width: 100%; max-width: 620px; height: auto; display: block; margin: 0 auto; filter: drop-shadow(0 18px 40px rgba(0, 0, 0, .45)); }
+.shot figcaption { color: var(--muted); font-size: 14.5px; margin: 18px auto 24px; max-width: 34em; }
+
+.grid { display: grid; gap: 14px; }
+@media (min-width: 640px) { .grid.two { grid-template-columns: 1fr 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+.card p { margin: 0; color: var(--muted); }
+
+/* Lista de casos de uso: cada ítem es una situación real, no una función. */
+.cases { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.cases li { padding-left: 26px; position: relative; }
+.cases li::before { content: ""; position: absolute; left: 4px; top: .7em; width: 9px; height: 9px; border-radius: 50%; background: var(--amber); }
+
+/* Gráfico de distorsión, dibujado a escala. */
+.chart { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; overflow-x: auto; margin: 8px 0 14px; }
+.chart svg { display: block; width: 100%; min-width: 520px; height: auto; }
+.chart text { font: 12px ui-monospace, Menlo, monospace; fill: var(--muted); }
+.chart .lbl { font: 13px -apple-system, system-ui, sans-serif; fill: var(--text); }
+.chart .val { fill: var(--text); font-weight: 600; }
+.chart .mine { fill: var(--amber); font-weight: 600; }
+.note { color: var(--muted); font-size: 14.5px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 15.5px; }
+.table { overflow-x: auto; margin: 8px 0 16px; }
+th, td { text-align: left; padding: 11px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 14px; }
+td.win { color: var(--amber); }
+
+/* Pasos de instalación: el orden importa, por eso van numerados. */
+ol.steps { padding-left: 22px; margin: 0 0 18px; display: grid; gap: 10px; }
+.warn { background: rgba(255, 176, 32, .08); border: 1px solid rgba(255, 176, 32, .3); border-radius: 12px; padding: 18px 20px; margin: 0 0 18px; }
+.warn h3 { color: var(--amber); }
+
+details { border-bottom: 1px solid var(--line); padding-block: 14px; }
+details:first-of-type { border-top: 1px solid var(--line); }
+summary { cursor: pointer; font-weight: 650; list-style-position: outside; }
+details p { margin: 10px 0 0; color: var(--muted); }
+
+footer { padding-block: 36px 56px; color: var(--muted); font-size: 14px; }
+footer p { margin: 0 0 6px; }

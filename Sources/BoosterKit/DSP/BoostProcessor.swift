@@ -7,8 +7,9 @@ public enum BoostMode: String, CaseIterable, Sendable {
     /// Solo ganancia y limitación. La dinámica queda intacta: lo que sonaba fuerte
     /// respecto de lo que sonaba bajo sigue igual. Lo correcto para música.
     ///
-    /// Ojo: con la ganancia en 100% este modo no hace nada, a propósito. Recién se
-    /// escucha al subir, cuando el limitador empieza a trabajar.
+    /// Ojo: con la ganancia en 100% este modo casi no hace nada, a propósito. Solo
+    /// toca los picos que ya vengan sobre el techo de −0,3 dBFS (true peak); recién
+    /// se escucha al subir, cuando el limitador empieza a trabajar.
     case transparent
     /// Agrega compresión con makeup, que sube lo bajo en vez de aplastar lo alto.
     /// Lo correcto para voz, llamadas y video con audio flojo.
@@ -51,6 +52,12 @@ public final class BoostProcessor {
     private var sampleRate: Double = 48_000
     private var channels = 2
 
+    /// La ganancia que se está aplicando, que persigue a `gain` en unos 10 ms. Un
+    /// salto de 100% a 400% aplicado de una muestra a la otra es un escalón de
+    /// 12 dB en la onda, y se oye como un clic.
+    private var appliedGain: Float = 1
+    private var gainCoefficient: Float = 0
+
     // Copias de los medidores para la interfaz, publicadas al final de cada bloque.
     private let publishedPeak = AtomicFloat(0)
     private let publishedLimiterReduction = AtomicFloat(0)
@@ -65,6 +72,8 @@ public final class BoostProcessor {
     public func prepare(sampleRate: Double, channels: Int) {
         self.sampleRate = sampleRate
         self.channels = min(max(channels, 1), Limiter.maximumChannels)
+        gainCoefficient = smoothingCoefficient(seconds: 0.010, sampleRate: Float(sampleRate))
+        appliedGain = gain
         equalizer.prepare(sampleRate: sampleRate)
         compressor.prepare(sampleRate: sampleRate)
         limiter.prepare(sampleRate: sampleRate, channels: self.channels)
@@ -80,17 +89,25 @@ public final class BoostProcessor {
         let channels = min(max(channels, 1), Limiter.maximumChannels)
         self.channels = channels
 
-        let gain = self.gain
+        let target = self.gain
         let applyCompression = (mode == .loudness)
-        let samples = frames * channels
 
-        for index in 0..<samples {
-            let raw = buffer[index] * gain
-            // Un solo NaN envenenaría el envolvente del compresor y los estados del
-            // ecualizador para siempre: NaN se propaga por toda cuenta, así que
-            // nunca se recuperan y la salida se muere. Un isFinite por muestra no
-            // cuesta nada medible y deja el procesador acotado por diseño.
-            buffer[index] = raw.isFinite ? raw : 0
+        for frame in 0..<frames {
+            if appliedGain != target {
+                appliedGain = target + gainCoefficient * (appliedGain - target)
+                // El suavizador nunca llega solo: se cierra a mano cuando la
+                // diferencia ya no se oye, y desde ahí la ganancia es exacta.
+                if abs(appliedGain - target) < 1e-5 { appliedGain = target }
+            }
+            let base = frame * channels
+            for channel in 0..<channels {
+                let raw = buffer[base + channel] * appliedGain
+                // Un solo NaN envenenaría el envolvente del compresor y los estados
+                // del ecualizador para siempre: NaN se propaga por toda cuenta, así
+                // que nunca se recuperan y la salida se muere. Un isFinite por
+                // muestra no cuesta nada medible y deja el procesador acotado.
+                buffer[base + channel] = raw.isFinite ? raw : 0
+            }
         }
 
         equalizer.process(buffer, frames: frames, channels: channels)
