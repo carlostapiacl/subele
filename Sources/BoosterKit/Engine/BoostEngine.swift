@@ -14,9 +14,13 @@ import Foundation
 ///                    ├─→ [tap, mutedWhenTapped] ──→ IOProc ──→ DSP ──┐
 /// this process ──────┴──── (excluded) ───────────────────────────────┴─→ output device
 /// ```
+///
+/// El motor es sincrónico y no es seguro entre hilos: `start` y `stop` pueden
+/// bloquearse dentro de CoreAudio. Lo maneja `EngineController`, que los llama
+/// siempre desde una misma cola que no es la principal.
 public final class BoostEngine {
 
-    public struct Info: Sendable {
+    public struct Info: Sendable, Equatable {
         public let deviceID: AudioDeviceID
         public let deviceName: String
         public let sampleRate: Double
@@ -27,11 +31,11 @@ public final class BoostEngine {
 
     public let processor = BoostProcessor()
 
-    /// Se llama en la cola principal cuando macOS cambia el dispositivo de salida
-    /// por defecto o cuando ese dispositivo cambia de frecuencia de muestreo. Un
-    /// tap está atado a un dispositivo y a un formato, así que sin rehacer la
-    /// cadena seguiríamos procesando para hardware que ya nadie escucha, o a una
-    /// frecuencia que ya no es la suya.
+    /// Se llama en la cola principal cuando cambia algo que deja la cadena vieja:
+    /// la salida por defecto, la frecuencia o los streams de ese dispositivo, o
+    /// el dispositivo desaparece. Un tap está atado a un dispositivo y a un
+    /// formato, así que sin rehacer la cadena seguiríamos procesando para hardware
+    /// que ya nadie escucha.
     public var onOutputChanged: (() -> Void)?
 
     /// Frames por callback que se le piden al dispositivo agregado. Más bajo es
@@ -39,49 +43,43 @@ public final class BoostEngine {
     /// `nil` deja lo que haya elegido CoreAudio.
     public var preferredBufferFrames: UInt32?
 
+    /// Cuánto esperar a que el agregado exponga el stream del tap antes de
+    /// instalar el IOProc. Arrancar antes da callbacks sin entrada.
+    public var readinessTimeout: TimeInterval = 1.5
+
     public private(set) var isRunning = false
     public private(set) var info: Info?
 
+    /// Lo que falló en el último `stop`, si algo falló. El teardown sigue igual
+    /// hasta el final; esto queda para el diagnóstico.
+    public private(set) var teardownProblems: [String] = []
+
     /// Medida, no estimada: la distancia entre el timestamp del audio que entra y
     /// el timestamp en que se va a reproducir, tomada del IOProc.
-    public var measuredIOLatencySeconds: Double { Double(latency.value) }
+    public var measuredIOLatencySeconds: Double { Double(renderer?.latency.value ?? 0) }
 
     /// Todo lo que esta cadena agrega por sobre reproducir derecho al dispositivo.
     public var addedLatencySeconds: Double {
         measuredIOLatencySeconds + Double(processor.limiter.lookaheadSeconds)
     }
 
-    private var tap: ProcessTap?
-    private var aggregate: AggregateDevice?
-    private var ioProcID: AudioDeviceIOProcID?
-    private var defaultOutputObserver: Any?
-    private var sampleRateObserver: Any?
+    /// Vueltas del IOProc desde que arrancó. Si deja de crecer con el motor
+    /// corriendo, el audio se detuvo.
+    public var callbackCount: UInt32 { renderer?.callbacks.value ?? 0 }
 
-    /// Buffer intercalado de trabajo, para reunir la entrada y repartir la salida.
-    /// Se asigna una vez y vive tanto como el motor: liberarlo mientras un IOProc
-    /// todavía puede correr sería un use-after-free.
-    private let maximumFrames = 8192
-    private let scratch: UnsafeMutablePointer<Float>
+    private let hal: AudioHAL
+    private var tapID: AudioObjectID?
+    private var aggregateID: AudioDeviceID?
+    private var ioProc: IOProcHandle?
+    private var renderer: IORenderer?
+    private var observers: [AnyObject] = []
 
-    /// La latencia medida vive en su propio atómico, no en una propiedad del
-    /// motor. El callback necesita escribirla, y llegar hasta `self` desde ahí
-    /// obligaría a capturarlo débil: una carga de referencia débil **toma un
-    /// lock** en el runtime de Swift, y un lock en el hilo de audio es justo lo que
-    /// no se puede hacer — puede invertir prioridades y cortar el audio. El atómico
-    /// se captura fuerte, y leerlo desde la interfaz no es una carrera.
-    private let latency = AtomicFloat(0)
-
-    public init(preferredBufferFrames: UInt32? = nil) {
+    public init(hal: AudioHAL = SystemAudioHAL(), preferredBufferFrames: UInt32? = nil) {
+        self.hal = hal
         self.preferredBufferFrames = preferredBufferFrames
-        scratch = .allocate(capacity: maximumFrames * Limiter.maximumChannels)
-        scratch.initialize(repeating: 0, count: maximumFrames * Limiter.maximumChannels)
     }
 
-    deinit {
-        stop()
-        scratch.deinitialize(count: maximumFrames * Limiter.maximumChannels)
-        scratch.deallocate()
-    }
+    deinit { stop() }
 
     public func start() throws {
         guard !isRunning else { return }
@@ -90,192 +88,142 @@ public final class BoostEngine {
 
     private func begin() throws {
         trace("pidiendo el dispositivo de salida por defecto")
-        let outputDevice = try AudioDevices.defaultOutput()
-        let outputUID = try AudioDevices.uid(of: outputDevice)
-        let deviceName = (try? AudioDevices.name(of: outputDevice)) ?? outputUID
+        let outputDevice = try hal.defaultOutputDevice()
+        let outputUID = try hal.uid(of: outputDevice)
+        let deviceName = (try? hal.name(of: outputDevice)) ?? outputUID
         trace("dispositivo: \(deviceName) uid=\(outputUID)")
 
-        let ownProcess = try AudioDevices.processObject(for: getpid())
-        trace("proceso propio=\(ownProcess); creando el tap")
-        let tap = try ProcessTap(excluding: [ownProcess], deviceUID: outputUID)
-        self.tap = tap
+        // Todo lo que se puede rechazar se rechaza antes de crear el tap: hasta
+        // ahí el sistema suena como siempre. Después, el tap ya silenció a todos.
+        let outputFormat = try hal.streamFormat(of: outputDevice, scope: kAudioObjectPropertyScopeOutput)
+        try StreamFormat.require(outputFormat, "la salida")
+        let outputLayout = hal.streamLayout(of: outputDevice, scope: kAudioObjectPropertyScopeOutput)
+        let outputChannels = outputLayout.reduce(0, +)
+        guard outputChannels > 0 else { throw AudioError("la salida no tiene canales") }
+        guard outputChannels <= StreamFormat.maximumChannels else {
+            throw AudioError("la salida tiene \(outputChannels) canales; "
+                             + "el máximo es \(StreamFormat.maximumChannels)")
+        }
+        let physicalInputBuffers = hal.streamLayout(
+            of: outputDevice, scope: kAudioObjectPropertyScopeInput).count
 
-        trace("tap creado id=\(tap.objectID); creando el dispositivo agregado")
-        let aggregate = try AggregateDevice(tapUUID: tap.uuid, outputDeviceUID: outputUID)
-        self.aggregate = aggregate
+        let ownProcess = try hal.ownProcessObject()
+        trace("proceso propio=\(ownProcess); creando el tap")
+        let tap = try hal.createTap(excluding: [ownProcess], deviceUID: outputUID)
+        tapID = tap.id
+
+        let tapFormat = try hal.tapFormat(of: tap.id)
+        try StreamFormat.require(tapFormat, "el tap")
+        let tapChannels = Int(tapFormat.mChannelsPerFrame)
+
+        trace("tap creado id=\(tap.id); creando el dispositivo agregado")
+        let aggregate = try hal.createAggregate(tapUUID: tap.uuid, outputDeviceUID: outputUID)
+        aggregateID = aggregate
 
         if let preferredBufferFrames {
-            aggregate.bufferFrameSize = preferredBufferFrames
+            hal.setBufferFrameSize(preferredBufferFrames, of: aggregate)
         }
 
-        let inputFormat = try AudioDevices.streamFormat(
-            of: aggregate.objectID, scope: kAudioObjectPropertyScopeInput)
-        let outputFormat = try AudioDevices.streamFormat(
-            of: aggregate.objectID, scope: kAudioObjectPropertyScopeOutput)
-
-        guard inputFormat.mFormatID == kAudioFormatLinearPCM,
-              inputFormat.mFormatFlags & kAudioFormatFlagIsFloat != 0 else {
-            throw AudioError("el tap no entregó audio float32 lineal")
+        let tapBuffers = try waitForTapStream(on: aggregate,
+                                              physicalInputBuffers: physicalInputBuffers,
+                                              tapChannels: tapChannels)
+        let aggregateOutput = hal.streamLayout(of: aggregate, scope: kAudioObjectPropertyScopeOutput)
+        guard aggregateOutput.reduce(0, +) == outputChannels else {
+            throw AudioError("el agregado no expone los \(outputChannels) canales de la salida")
         }
 
         let info = Info(deviceID: outputDevice,
                         deviceName: deviceName,
-                        sampleRate: inputFormat.mSampleRate,
-                        inputChannels: Int(inputFormat.mChannelsPerFrame),
-                        outputChannels: Int(outputFormat.mChannelsPerFrame),
-                        bufferFrames: Int(aggregate.bufferFrameSize))
-        self.info = info
+                        sampleRate: tapFormat.mSampleRate,
+                        inputChannels: tapChannels,
+                        outputChannels: outputChannels,
+                        bufferFrames: Int(hal.bufferFrameSize(of: aggregate)))
         trace("formato \(info.sampleRate) Hz \(info.inputChannels)->\(info.outputChannels), "
-              + "\(info.bufferFrames) frames por callback; instalando el IOProc")
+              + "\(info.bufferFrames) frames por callback, tap en buffers \(tapBuffers); "
+              + "instalando el IOProc")
 
         processor.prepare(sampleRate: info.sampleRate, channels: info.outputChannels)
 
-        try installIOProc(on: aggregate)
-
-        try check(AudioDeviceStart(aggregate.objectID, ioProcID),
-                  "arrancar el dispositivo agregado")
-
-        defaultOutputObserver = AudioDevices.observeDefaultOutput { [weak self] in
-            self?.onOutputChanged?()
+        // El bloque captura solo el renderer, fuerte: él es dueño de todo lo que
+        // el callback toca, así que vive tanto como el bloque y no como el motor.
+        let renderer = IORenderer(processor: processor, tapBuffers: tapBuffers)
+        self.renderer = renderer
+        ioProc = try hal.createIOProc(on: aggregate) { _, inputData, inputTime, outputData, outputTime in
+            renderer.recordLatency(input: inputTime, output: outputTime)
+            renderer.render(input: inputData, output: outputData)
         }
-        sampleRateObserver = AudioDevices.observeSampleRate(of: outputDevice) { [weak self] in
-            self?.onOutputChanged?()
-        }
+        try hal.startIO(ioProc!)
+
+        let changed: () -> Void = { [weak self] in self?.onOutputChanged?() }
+        observers = [
+            hal.observe(AudioObject.system, kAudioHardwarePropertyDefaultOutputDevice,
+                        scope: kAudioObjectPropertyScopeGlobal, changed),
+            hal.observe(outputDevice, kAudioDevicePropertyNominalSampleRate,
+                        scope: kAudioObjectPropertyScopeGlobal, changed),
+            hal.observe(outputDevice, kAudioDevicePropertyDeviceIsAlive,
+                        scope: kAudioObjectPropertyScopeGlobal, changed),
+            hal.observe(outputDevice, kAudioDevicePropertyStreamConfiguration,
+                        scope: kAudioObjectPropertyScopeOutput, changed),
+        ].compactMap { $0 }
+
+        self.info = info
         isRunning = true
         trace("corriendo")
     }
 
-    private func installIOProc(on aggregate: AggregateDevice) throws {
-        // Todo lo que el callback usa se captura por valor acá: referencias fuertes
-        // que el bloque retiene una sola vez, y punteros crudos. Nada que obligue a
-        // tocar ARC o a tomar un lock por cada vuelta.
-        let processor = self.processor
-        let scratch = self.scratch
-        let latency = self.latency
-        let maximumFrames = self.maximumFrames
-        let maximumChannels = Limiter.maximumChannels
-
-        try check(AudioDeviceCreateIOProcIDWithBlock(&ioProcID, aggregate.objectID, nil) {
-            _, inputData, inputTime, outputData, outputTime in
-
-            let output = UnsafeMutableAudioBufferListPointer(outputData)
-
-            // Los buffers de salida se llenan siempre. CoreAudio no garantiza que
-            // lleguen en cero, así que volver sin escribir reproduce lo que haya
-            // dejado el ciclo anterior — que es ruido.
-            for buffer in output {
-                if let data = buffer.mData { memset(data, 0, Int(buffer.mDataByteSize)) }
+    /// Un agregado recién creado puede tardar en exponer el stream del tap. Se
+    /// espera a verlo, y de paso se ubica dentro de la entrada.
+    private func waitForTapStream(on aggregate: AudioDeviceID, physicalInputBuffers: Int,
+                                  tapChannels: Int) throws -> Range<Int> {
+        let deadline = Date().addingTimeInterval(readinessTimeout)
+        while true {
+            let layout = hal.streamLayout(of: aggregate, scope: kAudioObjectPropertyScopeInput)
+            if let range = IORenderer.tapBufferRange(aggregateInput: layout,
+                                                     physicalInputBuffers: physicalInputBuffers,
+                                                     tapChannels: tapChannels) {
+                return range
             }
-
-            let input = UnsafeMutableAudioBufferListPointer(
-                UnsafeMutablePointer(mutating: inputData))
-            guard input.count > 0, output.count > 0 else { return }
-
-            // Los canales se suman sobre los buffers: un dispositivo NO
-            // intercalado presenta un buffer por canal, no un buffer con N
-            // canales. Mirar solo buffer[0] dejaría los demás en silencio.
-            var inputChannels = 0
-            var outputChannels = 0
-            var frames = Int.max
-            for buffer in input {
-                let channels = Int(buffer.mNumberChannels)
-                guard channels > 0, buffer.mData != nil else { return }
-                inputChannels += channels
-                frames = min(frames, Int(buffer.mDataByteSize) / (4 * channels))
+            guard Date() < deadline else {
+                throw AudioError("el dispositivo agregado no expuso el stream del tap "
+                                 + "(entrada: \(layout), tap: \(tapChannels) canales)")
             }
-            for buffer in output {
-                let channels = Int(buffer.mNumberChannels)
-                guard channels > 0, buffer.mData != nil else { return }
-                outputChannels += channels
-                frames = min(frames, Int(buffer.mDataByteSize) / (4 * channels))
-            }
-            guard frames > 0, outputChannels > 0, outputChannels <= maximumChannels
-            else { return }
-            frames = min(frames, maximumFrames)
-
-            BoostEngine.recordLatency(input: inputTime, output: outputTime, into: latency)
-
-            if input.count == 1, output.count == 1, inputChannels == outputChannels {
-                // El caso común: un solo buffer intercalado en cada punta.
-                let source = input[0].mData!.assumingMemoryBound(to: Float.self)
-                let destination = output[0].mData!.assumingMemoryBound(to: Float.self)
-                destination.update(from: source, count: frames * outputChannels)
-                processor.process(destination, frames: frames, channels: outputChannels)
-                return
-            }
-
-            // Caso general: reunir todo en un solo buffer intercalado…
-            var channel = 0
-            for buffer in input {
-                let channels = Int(buffer.mNumberChannels)
-                let source = buffer.mData!.assumingMemoryBound(to: Float.self)
-                for offset in 0..<channels where channel + offset < outputChannels {
-                    let target = channel + offset
-                    for frame in 0..<frames {
-                        scratch[frame * outputChannels + target] =
-                            source[frame * channels + offset]
-                    }
-                }
-                channel += channels
-            }
-            if inputChannels < outputChannels {
-                for frame in 0..<frames {
-                    for channel in inputChannels..<outputChannels {
-                        scratch[frame * outputChannels + channel] = 0
-                    }
-                }
-            }
-
-            processor.process(scratch, frames: frames, channels: outputChannels)
-
-            // …y repartirlo de vuelta.
-            channel = 0
-            for buffer in output {
-                let channels = Int(buffer.mNumberChannels)
-                let destination = buffer.mData!.assumingMemoryBound(to: Float.self)
-                for offset in 0..<channels {
-                    let source = channel + offset
-                    for frame in 0..<frames {
-                        destination[frame * channels + offset] =
-                            scratch[frame * outputChannels + source]
-                    }
-                }
-                channel += channels
-            }
-        }, "instalar el IOProc")
-    }
-
-    /// La distancia entre "este audio se capturó" y "este audio se va a escuchar",
-    /// directo de los timestamps que CoreAudio le pasa al callback.
-    ///
-    /// Estática y sin tocar `self` a propósito: se llama desde el hilo de audio.
-    private static func recordLatency(input: UnsafePointer<AudioTimeStamp>,
-                                      output: UnsafePointer<AudioTimeStamp>,
-                                      into latency: AtomicFloat) {
-        let inputStamp = input.pointee
-        let outputStamp = output.pointee
-        guard inputStamp.mFlags.contains(.hostTimeValid),
-              outputStamp.mFlags.contains(.hostTimeValid) else { return }
-        let inputNanos = AudioConvertHostTimeToNanos(inputStamp.mHostTime)
-        let outputNanos = AudioConvertHostTimeToNanos(outputStamp.mHostTime)
-        guard outputNanos > inputNanos else { return }
-        latency.value = Float(Double(outputNanos - inputNanos) / 1_000_000_000)
-    }
-
-    public func stop() {
-        defaultOutputObserver = nil
-        sampleRateObserver = nil
-        if let ioProcID, let aggregate {
-            AudioDeviceStop(aggregate.objectID, ioProcID)
-            AudioDeviceDestroyIOProcID(aggregate.objectID, ioProcID)
+            Thread.sleep(forTimeInterval: 0.02)
         }
-        ioProcID = nil
-        // El orden importa: el agregado referencia al tap, así que va primero.
-        // Los dos se destruyen solos en deinit.
-        aggregate = nil
-        tap = nil
+    }
+
+    /// Desarma la cadena en orden: detener el IOProc, destruirlo, destruir el
+    /// agregado (que referencia al tap) y al final el tap, que es el que devuelve
+    /// el audio a los demás procesos.
+    ///
+    /// Cada paso se intenta aunque el anterior haya fallado, y lo que falla queda
+    /// en `teardownProblems`. Lo que el callback usa es del renderer, que retiene
+    /// el propio bloque: si CoreAudio lo llamara después de un stop fallido, no hay
+    /// memoria liberada debajo.
+    public func stop() {
+        observers.removeAll()
+        let hadChain = ioProc != nil || aggregateID != nil || tapID != nil
+        var problems: [String] = []
+        func note(_ status: OSStatus, _ what: String) {
+            guard status != noErr else { return }
+            let error = AudioError(what, status: status).localizedDescription
+            trace(error)
+            problems.append(error)
+        }
+        if let ioProc {
+            note(hal.stopIO(ioProc), "detener el IOProc")
+            note(hal.destroyIOProc(ioProc), "destruir el IOProc")
+        }
+        if let aggregateID { note(hal.destroyAggregate(aggregateID), "destruir el agregado") }
+        if let tapID { note(hal.destroyTap(tapID), "destruir el tap") }
+        ioProc = nil
+        aggregateID = nil
+        tapID = nil
+        renderer = nil
         info = nil
         isRunning = false
+        // Un stop sin nada armado (el de deinit, uno repetido) no borra el
+        // diagnóstico del último teardown de verdad.
+        if hadChain { teardownProblems = problems }
     }
 
     // MARK: Frecuencia de muestreo
@@ -288,7 +236,8 @@ public final class BoostEngine {
     }
 
     /// Cambia la frecuencia de la salida por defecto, como Configuración de Audio
-    /// MIDI pero sin abrirla.
+    /// MIDI pero sin abrirla. **Es para todo el Mac**, no solo para Subele: el
+    /// dispositivo es uno, y las demás apps que lo usan pasan a esa frecuencia.
     ///
     /// No rehace la cadena acá: el cambio es asíncrono, y el observador de
     /// frecuencia dispara `onOutputChanged` cuando el dispositivo lo terminó de

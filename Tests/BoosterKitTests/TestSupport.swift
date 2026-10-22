@@ -53,3 +53,28 @@ func makeProcessor(gain: Float, mode: BoostMode,
 
 /// El techo del limitador, como nivel que la salida nunca debe pasar.
 let ceilingDecibels: Float = -0.3
+
+/// Distorsión armónica total en %, armónicos 2 a 10, sobre la segunda mitad de
+/// un canal. Goertzel en cada frecuencia: no hace falta una FFT para diez bins.
+func totalHarmonicDistortion(_ samples: [Float], channels: Int, frequency: Double,
+                             sampleRate: Double = 48_000) -> Double {
+    let frames = samples.count / channels
+    let start = frames / 2
+    // Un número entero de períodos, para que no haya fuga entre bins.
+    let period = sampleRate / frequency
+    let count = Int((Double(frames - start) / period).rounded(.down) * period)
+    func magnitude(_ target: Double) -> Double {
+        let w = 2 * Double.pi * target / sampleRate
+        let coefficient = 2 * cos(w)
+        var s1 = 0.0, s2 = 0.0
+        for frame in start..<(start + count) {
+            let s = Double(samples[frame * channels]) + coefficient * s1 - s2
+            s2 = s1
+            s1 = s
+        }
+        return sqrt(max(0, s1 * s1 + s2 * s2 - coefficient * s1 * s2))
+    }
+    let fundamental = magnitude(frequency)
+    let harmonics = (2...10).map { magnitude(frequency * Double($0)) }
+    return 100 * sqrt(harmonics.reduce(0) { $0 + $1 * $1 }) / fundamental
+}

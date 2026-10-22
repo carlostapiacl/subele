@@ -23,10 +23,27 @@ import Foundation
 /// silencio, justo en los transitorios fuertes que uno quería proteger. Con el
 /// mínimo de la ventana, desbordar es imposible por construcción y no por haber
 /// ajustado constantes hasta que se viera bien.
+///
+/// **True peak, no solo sample peak.** Las muestras no son la onda: entre dos
+/// muestras bajo el techo la señal reconstruida por el conversor puede pasarlo.
+/// El caso de libro es un seno a un cuarto de la frecuencia de muestreo con fase
+/// de 45°: cada muestra queda a −3 dB del pico real. Por eso el paso 2 no mira
+/// solo la muestra sino también tres puntos interpolados entre ella y la
+/// siguiente (sobremuestreo ×4, como pide ITU-R BS.1770), y la ganancia se
+/// calcula contra el mayor. La interpolación necesita unas muestras de futuro, así
+/// que la estimación llega `truePeakDelay` frames tarde; el lookahead la cubre
+/// con holgura.
 public final class Limiter {
 
-    public static let maximumChannels = 8
+    public static let maximumChannels = 32
     private static let maximumLookaheadFrames = 2048
+
+    /// Interpolador ×4: 12 muestras por fase, núcleo de Lanczos de orden 6.
+    private static let interpolatorTaps = 12
+    private static let interpolatorPhases = 3        // 1/4, 2/4 y 3/4 entre muestras
+    private static let historyFrames = 16            // potencia de 2, ≥ taps
+    /// Frames de retraso de la estimación de true peak respecto del frame que entra.
+    static let truePeakDelay = 6
 
     public var ceilingDecibels: Float = -0.3 {
         didSet { ceiling = decibelsToLinear(ceilingDecibels) }
@@ -58,6 +75,12 @@ public final class Limiter {
     private var queueTail = 0
     private var sampleCounter = 0
 
+    /// Últimas `historyFrames` muestras de cada canal, para interpolar.
+    private let history: UnsafeMutablePointer<Float>
+    private var historyIndex = 0
+    /// Coeficientes del interpolador, `interpolatorPhases` × `interpolatorTaps`.
+    private let interpolator: UnsafeMutablePointer<Float>
+
     /// Ganancia más baja aplicada durante el último bloque procesado, en dB (≤ 0).
     public private(set) var reductionDecibels: Float = 0
     /// Pico del último bloque procesado, lineal.
@@ -71,7 +94,33 @@ public final class Limiter {
         queueIndex.initialize(repeating: 0, count: queueCapacity)
         queueValue = .allocate(capacity: queueCapacity)
         queueValue.initialize(repeating: 1, count: queueCapacity)
+        history = .allocate(capacity: Limiter.historyFrames * Limiter.maximumChannels)
+        history.initialize(repeating: 0, count: Limiter.historyFrames * Limiter.maximumChannels)
+        interpolator = .allocate(capacity: Limiter.interpolatorPhases * Limiter.interpolatorTaps)
+        interpolator.initialize(repeating: 0,
+                                count: Limiter.interpolatorPhases * Limiter.interpolatorTaps)
+        Limiter.designInterpolator(into: interpolator)
         prepare(sampleRate: 48_000, channels: 2)
+    }
+
+    /// La fase k estima la señal a (k+1)/4 del camino entre la muestra n−6 y la
+    /// n−5, a partir de las doce muestras n−11…n. Cada fase se normaliza a ganancia 1 en
+    /// continua, para que una señal constante no se lea más alta de lo que es.
+    private static func designInterpolator(into coefficients: UnsafeMutablePointer<Float>) {
+        func sinc(_ x: Double) -> Double { x == 0 ? 1 : sin(Double.pi * x) / (Double.pi * x) }
+        let order = Double(interpolatorTaps / 2)
+        for phase in 0..<interpolatorPhases {
+            let fraction = Double(phase + 1) / Double(interpolatorPhases + 1)
+            var taps = [Double](repeating: 0, count: interpolatorTaps)
+            for tap in 0..<interpolatorTaps {
+                let t = Double(tap) - Double(truePeakDelay - 1) - fraction
+                taps[tap] = abs(t) < order ? sinc(t) * sinc(t / order) : 0
+            }
+            let sum = taps.reduce(0, +)
+            for tap in 0..<interpolatorTaps {
+                coefficients[phase * interpolatorTaps + tap] = Float(taps[tap] / sum)
+            }
+        }
     }
 
     deinit {
@@ -81,12 +130,19 @@ public final class Limiter {
         queueIndex.deallocate()
         queueValue.deinitialize(count: queueCapacity)
         queueValue.deallocate()
+        history.deinitialize(count: Limiter.historyFrames * Limiter.maximumChannels)
+        history.deallocate()
+        interpolator.deinitialize(count: Limiter.interpolatorPhases * Limiter.interpolatorTaps)
+        interpolator.deallocate()
     }
 
     public func prepare(sampleRate: Double, channels: Int) {
         self.channels = min(max(channels, 1), Limiter.maximumChannels)
         ceiling = decibelsToLinear(ceilingDecibels)
-        lookaheadFrames = min(Int(lookaheadSeconds * Float(sampleRate)),
+        // Nunca menos que el retraso de la estimación de true peak: si no, el
+        // frame saldría antes de que llegue su propia estimación.
+        lookaheadFrames = min(max(Int(lookaheadSeconds * Float(sampleRate)),
+                                  Limiter.truePeakDelay + 1),
                               Limiter.maximumLookaheadFrames - 1)
         releaseCoefficient = smoothingCoefficient(seconds: releaseSeconds,
                                                   sampleRate: Float(sampleRate))
@@ -96,6 +152,8 @@ public final class Limiter {
     public func reset() {
         delayLine.update(repeating: 0, count: delayCapacityFrames * Limiter.maximumChannels)
         writeIndex = 0
+        history.update(repeating: 0, count: Limiter.historyFrames * Limiter.maximumChannels)
+        historyIndex = 0
         queueHead = 0
         queueTail = 0
         sampleCounter = 0
@@ -118,13 +176,33 @@ public final class Limiter {
         var lowestGain: Float = 1
         var peak: Float = 0
 
+        let historyStride = Limiter.historyFrames
+        let historyMask = Limiter.historyFrames - 1
+        let taps = Limiter.interpolatorTaps
+
         for frame in 0..<frames {
             let base = frame * channels
 
+            // True peak del frame que entró hace `truePeakDelay`: su muestra y
+            // los tres puntos interpolados hasta la siguiente, en cada canal.
             var framePeak: Float = 0
+            let newest = historyIndex
             for channel in 0..<channels {
-                framePeak = max(framePeak, abs(buffer[base + channel]))
+                let ring = history + channel * historyStride
+                ring[newest] = buffer[base + channel]
+                framePeak = max(framePeak,
+                                abs(ring[(newest &- Limiter.truePeakDelay) & historyMask]))
+                for phase in 0..<Limiter.interpolatorPhases {
+                    let k = interpolator + phase * taps
+                    var value: Float = 0
+                    // Tap 0 es la muestra más vieja (n−11), tap 11 la que acaba de entrar.
+                    for tap in 0..<taps {
+                        value += k[tap] * ring[(newest &- (taps - 1) &+ tap) & historyMask]
+                    }
+                    framePeak = max(framePeak, abs(value))
+                }
             }
+            historyIndex = (historyIndex + 1) & historyMask
 
             // Línea de retardo: guardar el frame que entra, ubicar el que sale.
             let writeBase = writeIndex * stride

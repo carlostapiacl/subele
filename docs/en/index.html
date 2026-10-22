@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Subele | Free volume booster for Mac, no drivers required</title>
+<meta name="description" content="Free volume booster for Mac. Turn sound up to 400% without distortion, without installing an audio driver, and without an account. Open source, macOS 14.2 or later.">
+<link rel="canonical" href="https://carlostapiacl.github.io/subele/en/">
+<link rel="alternate" hreflang="es" href="https://carlostapiacl.github.io/subele/">
+<link rel="alternate" hreflang="en" href="https://carlostapiacl.github.io/subele/en/">
+<link rel="alternate" hreflang="x-default" href="https://carlostapiacl.github.io/subele/en/">
+<link rel="icon" href="../icon.png">
+<link rel="stylesheet" href="../site.css">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_US">
+<meta property="og:url" content="https://carlostapiacl.github.io/subele/en/">
+<meta property="og:title" content="Subele | More volume for your Mac, no drivers">
+<meta property="og:description" content="Mac at 100% and still too quiet? Subele turns it up to 400% without it sounding blown out. Free and open source.">
+<meta property="og:image" content="https://carlostapiacl.github.io/subele/og-en.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Subele",
+  "description": "Volume booster for macOS. Turns system audio up to 400% without installing a driver, with a limiter that prevents distortion.",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "macOS 14.2 or later",
+  "softwareVersion": "0.2.2",
+  "inLanguage": ["en", "es"],
+  "url": "https://carlostapiacl.github.io/subele/en/",
+  "downloadUrl": "https://github.com/carlostapiacl/subele/releases/latest/download/Subele.dmg",
+  "image": "https://carlostapiacl.github.io/subele/screenshot-ecualizador.png",
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Person", "name": "Carlos Tapia", "url": "https://carlostapia.cl" }
+}
+</script>
+<!-- Plausible: no cookies, no personal data. Counts visits and downloads. -->
+<script defer data-domain="carlostapiacl.github.io" src="https://plausible.carlostapia.cl/js/script.file-downloads.outbound-links.js"></script>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <nav class="top">
+      <a class="brand" href="./"><img src="../icon.png" alt="" width="28" height="28">Subele</a>
+      <a class="lang" href="../" hreflang="es" lang="es">Español</a>
+    </nav>
+    <p class="ask">Mac volume at 100% and still too quiet?</p>
+    <h1>Turn your Mac up past 100%</h1>
+    <p class="sub">Subele boosts videos, music and calls up to 400% without them sounding blown out. No audio driver, no account, and it's free.</p>
+    <div class="actions">
+      <a class="btn" href="https://github.com/carlostapiacl/subele/releases/latest/download/Subele.dmg">Download free for Mac</a>
+      <a class="btn ghost" href="#install">How to install</a>
+    </div>
+    <p class="req">macOS 14.2 or later · Intel and Apple Silicon · open source (MIT)</p>
+  </div>
+</header>
+
+<figure class="shot"><div class="wrap">
+  <img src="../screenshot-ecualizador.png" width="675" height="642"
+       alt="Subele's menu bar window, with the volume slider, the Music/Voice switch and the graphical equalizer open">
+  <figcaption>It lives in the menu bar. Open it, move the slider, get back to what you were doing.</figcaption>
+</div></figure>
+
+<section><div class="wrap">
+  <h2>When it helps</h2>
+  <ul class="cases">
+    <li>A video or course recorded too quietly to follow, even at full volume.</li>
+    <li>A Zoom, Meet or Teams call where the other person speaks softly.</li>
+    <li>MacBook speakers that fall short in a noisy room.</li>
+    <li>A podcast or film with quiet dialogue and loud explosions.</li>
+  </ul>
+</div></section>
+
+<section><div class="wrap">
+  <h2>What you get</h2>
+  <div class="grid two">
+    <div class="card"><h3>Up to 400%</h3><p>A slider from 50 to 400%. A limiter brings peaks down before they arrive, so the sound holds together as you go up.</p></div>
+    <div class="card"><h3>Music or Voice</h3><p><strong>Music</strong> turns everything up evenly and keeps the dynamics. <strong>Voice</strong> lifts what is too quiet, for calls, podcasts and videos with weak audio.</p></div>
+    <div class="card"><h3>Graphical equalizer</h3><p>Bass, mids and treble in five bands you drag on the curve, with a live spectrum and presets such as Clear voice or More bass.</p></div>
+    <div class="card"><h3>No drivers</h3><p>Built on the audio API in macOS 14.2. No virtual device, and your output stays as it is. To uninstall, delete the app.</p></div>
+  </div>
+</div></section>
+
+<section id="no-distortion"><div class="wrap">
+  <h2>Louder without sounding blown out</h2>
+  <p>There are two ways to keep boosted audio from going past full scale. One is to clip or round off every peak that goes over: simple, but it bends the waveform, and that is the tinny "boosted" sound. The other is to see the peak a few milliseconds early and turn the volume down by just enough. Subele does the second.</p>
+  <div class="chart">
+    <svg viewBox="0 0 640 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Distortion at 400% volume. Signal in at −12 dBFS: per-sample soft limiter 1.0%, Subele 0.0004%. At −6 dBFS: 23.2% against 0.0004%. At 0 dBFS: 35.4% against 0.0004%.">
+      <g stroke="rgba(255,255,255,.1)" stroke-width="1">
+        <line x1="150" y1="20" x2="150" y2="215"/><line x1="265" y1="20" x2="265" y2="215"/>
+        <line x1="380" y1="20" x2="380" y2="215"/><line x1="495" y1="20" x2="495" y2="215"/>
+        <line x1="610" y1="20" x2="610" y2="215"/>
+      </g>
+      <text x="150" y="235" text-anchor="middle">0%</text><text x="265" y="235" text-anchor="middle">10%</text>
+      <text x="380" y="235" text-anchor="middle">20%</text><text x="495" y="235" text-anchor="middle">30%</text>
+      <text x="610" y="235" text-anchor="middle">40%</text>
+      <text class="lbl" x="0" y="52">In at −12 dBFS</text>
+      <rect x="150" y="34" width="11.5" height="16" rx="2" fill="#8eaee6"/><text class="val" x="168" y="47">1.0%</text>
+      <rect x="150" y="54" width="2" height="16" rx="1" fill="#ffb020"/><text class="mine" x="160" y="67">0.0004%</text>
+      <text class="lbl" x="0" y="117">In at −6 dBFS</text>
+      <rect x="150" y="99" width="266.8" height="16" rx="2" fill="#8eaee6"/><text class="val" x="424" y="112">23.2%</text>
+      <rect x="150" y="119" width="2" height="16" rx="1" fill="#ffb020"/><text class="mine" x="160" y="132">0.0004%</text>
+      <text class="lbl" x="0" y="182">In at 0 dBFS</text>
+      <rect x="150" y="164" width="407.1" height="16" rx="2" fill="#8eaee6"/><text class="val" x="565" y="177">35.4%</text>
+      <rect x="150" y="184" width="2" height="16" rx="1" fill="#ffb020"/><text class="mine" x="160" y="197">0.0004%</text>
+    </svg>
+  </div>
+  <p class="note">Total harmonic distortion of a 1 kHz sine with the volume at 400%. In blue, a per-sample <em>soft limiter</em>, computed with the formula FineTune publishes in its source; in amber, Subele, measured with its real processor (it is a test in the repository). It is a test signal. With music the gap changes, and recording each app's actual output is still to be done (to be confirmed). <a href="https://github.com/carlostapiacl/subele/tree/main/experimentos/2026-10-22-distorsion-frente-a-finetune">The full test</a> is in the repo.</p>
+  <p>The limiter also watches the peaks <strong>between</strong> samples, the ones your Mac's converter can rebuild above full scale even when every sample is below it.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Subele, FineTune and eqMac</h2>
+  <p>All three turn the volume up, and each one aims at something different.</p>
+  <div class="table"><table>
+    <tr><th></th><th>Subele</th><th>FineTune</th><th>eqMac</th></tr>
+    <tr><td>Installs an audio driver</td><td class="win">No</td><td>No</td><td>Yes</td></tr>
+    <tr><td>Price</td><td class="win">Free</td><td>Free</td><td>Free, with a Pro plan</td></tr>
+    <tr><td>How it stays under full scale</td><td class="win">Turns down ahead of time, including inter-sample peaks</td><td>Rounds off every sample that goes over</td><td>(to be confirmed)</td></tr>
+    <tr><td>Minimum macOS</td><td class="win">14.2 Sonoma</td><td>15 Sequoia</td><td>(to be confirmed)</td></tr>
+    <tr><td>Spanish interface</td><td class="win">Yes</td><td>No</td><td>(to be confirmed)</td></tr>
+    <tr><td>Per-app volume</td><td>No</td><td class="win">Yes</td><td>In the Pro plan</td></tr>
+    <tr><td>Equalizer</td><td>5 bands</td><td class="win">10 bands, headphone profiles</td><td>10 bands</td></tr>
+    <tr><td>Install</td><td>Un-notarised .dmg</td><td class="win">Homebrew</td><td>Installer with a driver</td></tr>
+  </table></div>
+  <p class="muted">If you need per-app volume, routing to several outputs or headphone profiles, FineTune is the better pick. Subele is made to turn the whole Mac up without it falling apart.</p>
+</div></section>
+
+<section id="install"><div class="wrap">
+  <h2>How to install</h2>
+  <ol class="steps">
+    <li><a href="https://github.com/carlostapiacl/subele/releases/latest/download/Subele.dmg">Download Subele.dmg</a>, open it and drag Subele to Applications.</li>
+    <li>Open Subele. The first time, macOS will block it; how to open it is below.</li>
+    <li>When asked, allow <strong>Audio Recording</strong>. That is what lets it read the system sound to turn it up.</li>
+    <li>Find the icon in the menu bar and move the slider.</li>
+  </ol>
+  <div class="warn">
+    <h3>Why macOS blocks it</h3>
+    <p>The app is signed but <strong>not notarised</strong>: notarisation requires a paid Apple Developer account. You will see "Apple could not verify this app is free of malware". To open it anyway:</p>
+    <p><strong>System Settings → Privacy &amp; Security</strong>, scroll to the notice about Subele and click <strong>Open Anyway</strong>. Or in Terminal:</p>
+    <pre><code>xattr -d com.apple.quarantine "/Applications/Subele.app"</code></pre>
+    <p class="muted" style="margin:0">On macOS 15 the old Control-click → Open trick is no longer enough.</p>
+  </div>
+  <h3>Check the .dmg</h3>
+  <p>Each version publishes the SHA-256 of its files in <code>SHA256SUMS.txt</code>, on the <a href="https://github.com/carlostapiacl/subele/releases/latest">release page</a>. To compare it with your download:</p>
+  <pre><code>shasum -a 256 ~/Downloads/Subele.dmg</code></pre>
+  <p>And if you would rather not trust any binary, build it yourself. No Xcode needed:</p>
+  <pre><code>git clone https://github.com/carlostapiacl/subele
+cd subele
+./build-app.sh</code></pre>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Questions</h2>
+  <details><summary>Why does it ask for audio recording permission?</summary>
+    <p>To turn the volume up it has to read the sound leaving your Mac, process it and send it back. That permission is how macOS allows it. The audio never leaves your Mac. The app has no server, no account and no telemetry, and the code is public.</p></details>
+  <details><summary>Does it work with Bluetooth headphones or speakers?</summary>
+    <p>Yes. It works on whatever output macOS is using and rebuilds itself when you switch. AirPlay speakers are not tested yet (to be confirmed).</p></details>
+  <details><summary>Does it add delay?</summary>
+    <p>About 15 ms with the default setting, measured from the audio itself. You won't notice it in music or calls. If you notice it in video, the Latency menu has a 128-frame option of about 9 ms.</p></details>
+  <details><summary>Does it drain the battery?</summary>
+    <p>Very little. On a 2019 Intel MacBook Pro with music playing it used about 1% CPU. Apple Silicon should be lower (to be confirmed).</p></details>
+  <details><summary>Does it work with eqMac or Boom 3D running?</summary>
+    <p>No. Those apps install their own driver and become the system output, and Subele hangs trying to read it. Quit them before opening Subele.</p></details>
+  <details><summary>How do I uninstall it?</summary>
+    <p>Quit it from its menu and delete Subele from Applications. It leaves no driver or anything else installed.</p></details>
+</div></section>
+
+<section><div class="wrap">
+  <h2>How it works inside</h2>
+  <p>Since macOS 14.2 there is a public API, <code>AudioHardwareCreateProcessTap</code>, that captures what other apps are playing without a driver in between. Subele captures that audio, runs it through gain, an equalizer, a compressor (in Voice mode) and a limiter that looks 3 ms ahead, and plays it back to the same speakers. Your default output does not change.</p>
+  <p>The details, measurements and tests are in the <a href="https://github.com/carlostapiacl/subele">repository README</a>.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Support the project</h2>
+  <p>Subele is free and will stay that way. There is no paid tier. If it helped and you want to chip in, it's appreciated; if not, use it anyway.</p>
+  <p><a class="btn ghost" href="https://paypal.me/carlostapiacl">Donate with PayPal</a></p>
+</div></section>
+
+<footer><div class="wrap">
+  <p>MIT · <a href="https://github.com/carlostapiacl/subele">GitHub</a> · built by <a href="https://carlostapia.cl">Carlos Tapia</a></p>
+  <p>This page counts visits with Plausible, with no cookies and no personal data. The app sends nothing.</p>
+</div></footer>
+
+</body>
+</html>

@@ -1,53 +1,123 @@
 name: release
 
 # Publica un .dmg descargable cuando se empuja una etiqueta de versión:
-#   git tag v0.2.1 && git push origin v0.2.1
+#   git tag v0.2.2 && git push origin v0.2.2
+#
+# Dos jobs con permisos distintos a propósito. El que compila no puede escribir
+# en el repo; el que publica no compila nada, solo sube lo que el primero dejó.
+# Cada .dmg sale con su SHA-256 y con una atestación de procedencia firmada por
+# GitHub, que ata el archivo a este workflow y a este commit. Eso no reemplaza
+# la notarización de Apple, pero deja verificar que el .dmg descargado salió de
+# este código y no de otro lado.
+#
+# Las Actions van fijadas por SHA completo, no por etiqueta: una etiqueta se
+# puede mover, un SHA no.
 on:
   push:
     tags: ['v*']
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
-  release:
+  build:
     runs-on: macos-15
+    permissions:
+      contents: read
+      id-token: write        # para firmar la atestación
+      attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: La etiqueta coincide con la versión del código
+        run: |
+          VERSION=$(sed -n 's/.*let version = "\(.*\)"/\1/p' Sources/BoosterKit/Booster.swift)
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "La etiqueta es $GITHUB_REF_NAME pero el código dice $VERSION" >&2
+            exit 1
+          fi
 
       - name: Compilar, testear y empaquetar
         run: |
           ./build-app.sh
           ./Tools/make-dmg.sh
 
+      # Una copia con nombre fijo, para que el sitio enlace siempre a
+      # releases/latest/download/Subele.dmg sin conocer la versión.
+      - name: Nombre estable y checksums
+        run: |
+          cd dist
+          cp "subele-${GITHUB_REF_NAME#v}.dmg" Subele.dmg
+          shasum -a 256 *.dmg | tee SHA256SUMS.txt
+
+      - name: Atestación de procedencia
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: dist/*.dmg
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: release
+          path: |
+            dist/*.dmg
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # crear la release
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: release
+          path: dist
+
       - name: Publicar
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.dmg \
+          gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
             --title "Subele $GITHUB_REF_NAME" \
             --notes-file - <<'NOTES'
           ## Instalación
 
-          Descargá el `.dmg`, abrilo y arrastrá **Subele** a Aplicaciones.
+          Descarga el `.dmg`, ábrelo y arrastra **Subele** a Aplicaciones.
+
+          ### Verificar que el .dmg es este código
+
+          El `.dmg` lo compila GitHub Actions desde la etiqueta, no una máquina
+          personal. Para comprobarlo:
+
+          ```
+          shasum -a 256 -c SHA256SUMS.txt
+          gh attestation verify subele-*.dmg --repo carlostapiacl/subele
+          ```
+
+          La segunda línea confirma que el archivo salió de este repositorio y de
+          este workflow.
 
           ### La primera vez macOS la va a bloquear
 
-          La app está firmada ad-hoc pero **no notarizada** — notarizar exige una
+          La app está firmada ad-hoc pero **no notarizada**. Notarizar exige una
           cuenta de Apple Developer de pago. Al abrirla vas a ver *"Apple no pudo
           verificar que esté libre de malware"*.
 
           Para destrabarla, una de estas dos:
 
-          - **Ajustes del Sistema → Privacidad y seguridad**, bajá hasta el aviso
-            sobre Subele y tocá **Abrir igualmente**.
+          - **Ajustes del Sistema → Privacidad y seguridad**, baja hasta el aviso
+            sobre Subele y toca **Abrir igualmente**.
           - O en la Terminal:
             ```
             xattr -d com.apple.quarantine "/Applications/Subele.app"
             ```
 
-          Si preferís no confiar en un binario sin notarizar —razonable—, compilala
-          vos: `./build-app.sh`. Son unos segundos y no necesita Xcode.
+          Si prefieres no confiar en un binario sin notarizar, compílala tú
+          con `./build-app.sh`. Son unos segundos y no necesita Xcode.
 
           ---
 
@@ -56,12 +126,16 @@ jobs:
 
           Download the `.dmg`, open it and drag **Subele** to Applications.
 
+          The `.dmg` is built by GitHub Actions from the tag. Verify it with
+          `shasum -a 256 -c SHA256SUMS.txt` and
+          `gh attestation verify subele-*.dmg --repo carlostapiacl/subele`.
+
           The app is ad-hoc signed but **not notarised**, so macOS will block it the
           first time. Either go to **System Settings → Privacy & Security** and click
           **Open Anyway**, or run
           `xattr -d com.apple.quarantine "/Applications/Subele.app"`.
 
-          Or build it yourself with `./build-app.sh` — it takes seconds and needs no
+          Or build it yourself with `./build-app.sh`. It takes seconds and needs no
           Xcode.
           </details>
           NOTES
