@@ -10,12 +10,12 @@
 **Sube macOS más allá del 100% sin instalar drivers, y sin que suene a parlante
 reventado.**
 
-Una app de barra de menú. Movés el slider, el sistema suena más fuerte. Lo raro
+Una app de barra de menú. Mueves el slider, el sistema suena más fuerte. Lo raro
 está abajo: ninguna extensión de kernel, ningún driver de audio, y tu dispositivo
 de salida por defecto nunca queda secuestrado.
 
 Es gratis y de código abierto. Si te sirve, [se agradece una donación](https://paypal.me/carlostapiacl);
-si no, usala igual. *(Antes se llamaba audio-booster.)*
+si no, úsala igual. *(Antes se llamaba audio-booster.)*
 
 <p align="center"><img src="docs/screenshot-ecualizador.png" width="640" alt="El menú de Subele con el ecualizador gráfico abierto"></p>
 
@@ -23,8 +23,8 @@ si no, usala igual. *(Antes se llamaba audio-booster.)*
 
 ## Por qué existe
 
-Todos los amplificadores de volumen de macOS funcionan igual desde hace una
-década. Boom 3D, eqMac y el resto instalan un `AudioServerPlugIn` en
+Durante una década los amplificadores de volumen de macOS funcionaron igual.
+Boom 3D, eqMac y el resto instalan un `AudioServerPlugIn` en
 `/Library/Audio/Plug-Ins/HAL`, se ponen como salida por defecto del sistema y
 pasan el audio hacia el hardware real. Eso implica un driver que firmar, un
 instalador, `sudo`, tu salida secuestrada sin avisar, y algo que se rompe cada vez
@@ -32,20 +32,25 @@ que Apple saca una actualización.
 
 **macOS 14.2 volvió todo eso innecesario.** `AudioHardwareCreateProcessTap` es una
 API pública que captura lo que otros procesos están reproduciendo, sin driver de
-por medio. Este proyecto está construido sobre eso.
+por medio. Este proyecto está construido sobre eso, y no es el único:
+[FineTune](https://github.com/ronitsingh10/FineTune) también usa taps y hace mucho
+más (volumen por app, ruteo, AutoEQ). Lo que separa a Subele es cómo sube.
 
 |  | boosters con driver | Subele |
 | --- | --- | --- |
 | Instala driver | sí, con `sudo` | no |
 | Toma la salida por defecto | sí | **no** |
-| Al subir el volumen | ganancia cruda, después clipping | limitador con lookahead, sin clipping |
-| Control por aplicación | no | posible (el tap acepta lista de procesos) |
 | Desinstalar | sacar el driver | borrar la app |
 
-La segunda fila es la que se siente. Multiplicar una señal por tres significa que
-todo lo que pasaba de un tercio de escala queda con las puntas cortadas, y una
-onda cortada es ese sonido fino y a lata del "volumen aumentado". Un limitador que
-ve el pico antes de que llegue no tiene que cortar nada.
+Multiplicar una señal por tres significa que todo lo que pasaba de un tercio de
+escala se pasa del máximo, y hay que hacer algo con eso. Recortar o redondear cada
+muestra que se pasa, que es lo que hace un *soft clipper*, deforma la onda, y de
+ahí sale ese sonido fino y a lata del "volumen aumentado". Un limitador que ve el pico antes de que
+llegue baja la ganancia entera y no deforma nada. Con un seno de 1 kHz a 400 %, el
+soft limiter que publica FineTune da 23 % de distorsión armónica entrando a −6 dBFS
+(`Tools/thd-softclip.py`); Subele da 0,0004 % con la misma señal (test
+`boostingDoesNotDistort`). Es una señal de prueba, y todavía falta medirlo
+grabando la salida de cada app (por confirmar).
 
 ## Cómo funciona
 
@@ -118,8 +123,8 @@ techo, la onda que reconstruye el conversor puede pasarlo: un seno a un cuarto d
 la frecuencia de muestreo con fase de 45° tiene todas sus muestras a −3 dBFS y
 llega a 0 dBFS de verdad. El paso 2 mira la muestra y tres puntos interpolados
 hasta la siguiente (sobremuestreo ×4, como ITU-R BS.1770) y calcula la ganancia
-contra el mayor. Es una estimación —un interpolador de 12 muestras, no uno
-ideal—, y el test de ese seno exige que la salida quede a 0,1 dB del techo.
+contra el mayor. Es una estimación hecha con un interpolador de 12 muestras, y el test de ese
+seno exige que la salida quede a 0,1 dB del techo.
 
 La ganancia del slider tampoco salta: persigue al valor nuevo en unos 10 ms, así
 pasar de 100% a 400% no hace clic.
@@ -169,8 +174,8 @@ inestable.
 El menú **Frecuencia de muestreo** cambia la salida entre las frecuencias que
 acepte el dispositivo (44,1, 48, 96 kHz…), lo mismo que hacerlo en Configuración
 de Audio MIDI, pero sin saber que esa app existe. El cambio es para todo el
-sistema —las otras apps que usan ese dispositivo también pasan a esa
-frecuencia, y el menú lo dice—, y la cadena se rehace sola cuando el dispositivo lo termina de aplicar,
+sistema (las otras apps que usan ese dispositivo también pasan a esa frecuencia,
+y el menú lo avisa), y la cadena se rehace sola cuando el dispositivo lo termina de aplicar,
 también si se cambia desde afuera.
 
 Lo que gana y lo que no: subir de 44,1 a 96 kHz no le agrega detalle a una
@@ -213,16 +218,16 @@ Tools de Xcode alcanzan: este proyecto se compila sin Xcode.
 
 > Gratis. Si te sirve: [donar por PayPal](https://paypal.me/carlostapiacl).
 
-Bajá el `.dmg` de la [última versión](https://github.com/carlostapiacl/subele/releases/latest),
-abrilo y arrastrá **Subele** a Aplicaciones.
+Baja el `.dmg` de la [última versión](https://github.com/carlostapiacl/subele/releases/latest),
+ábrelo y arrastra **Subele** a Aplicaciones.
 
 **La primera vez macOS la va a bloquear.** La app está firmada ad-hoc pero **no
 notarizada**: notarizar exige una cuenta de Apple Developer de pago (USD 99 al
 año). Vas a ver *"Apple no pudo verificar que esté libre de malware"*. Para
 destrabarla, una de estas dos:
 
-- **Ajustes del Sistema → Privacidad y seguridad**, bajá hasta el aviso sobre
-  Subele y tocá **Abrir igualmente**.
+- **Ajustes del Sistema → Privacidad y seguridad**, baja hasta el aviso sobre
+  Subele y toca **Abrir igualmente**.
 - O en la Terminal:
   ```bash
   xattr -d com.apple.quarantine "/Applications/Subele.app"
@@ -233,7 +238,7 @@ por Ajustes del Sistema.
 
 ### Compilar
 
-Si preferís no confiar en un binario sin notarizar —razonable—, son unos
+Si prefieres no confiar en un binario sin notarizar, son unos
 segundos:
 
 ```bash
@@ -329,7 +334,7 @@ el buffer de trabajo, formatos incompatibles (16 bits, float64, big-endian, más
 de 32 canales) rechazados antes de crear el tap, un agregado que tarda en estar
 listo, un `AudioDeviceStop` que falla sin dejar memoria liberada bajo un
 callback vivo, cien arranques y paradas sin perder recursos, y el watchdog
-rehaciendo la cadena cuando el IOProc se detiene —y rindiéndose si no sirve—.
+rehaciendo la cadena cuando el IOProc se detiene, o rindiéndose si no sirve.
 
 Lo que **no** cubren y queda para hardware real (por confirmar): interfaces USB
 dúplex concretas, desconectar un Bluetooth mientras suena, y el arranque sin
@@ -389,6 +394,9 @@ Sources/subele/              el ejecutable
   ConsoleMode.swift
   Strings.swift              todo el texto visible, tipado, en dos idiomas
 Tools/make-icon.swift        genera AppIcon.icns
+Tools/make-og.swift          genera las imágenes para compartir el sitio
+Tools/thd-softclip.py        distorsión de un soft limiter por muestra, para comparar
+docs/                        el sitio: / en español, /en/ en inglés
 Tests/BoosterKitTests/       DSP, renderer, motor y controlador sobre FakeAudioHAL
 ```
 

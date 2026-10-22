@@ -176,7 +176,7 @@ struct Strings {
               · eqMac, Boom 3D or another driver-based booster is running and owns
                 the default output device. Ours then taps their virtual device,
                 which is itself passing audio through, and the two deadlock.
-                Quit it:  pkill -f eqMac.app
+                Quit it from its menu bar icon, or in Terminal:  killall eqMac
               · Audio capture permission is missing: System Settings → Privacy &
                 Security → Audio Recording.
 
@@ -223,7 +223,7 @@ struct Strings {
         sampleRateFailed: "No se pudo cambiar",
         sampleRateSystemWide: "Vale para todo el Mac, no solo para Subele",
         equalizerMenu: "Ecualizador",
-        equalizerHint: "Arrastrá un punto · doble clic lo vuelve a cero",
+        equalizerHint: "Arrastra un punto · doble clic lo vuelve a cero",
         presetFlat: "Plano",
         presetBass: "Más graves",
         presetVoice: "Voz clara",
@@ -264,7 +264,8 @@ struct Strings {
               · eqMac, Boom 3D u otro booster con driver está corriendo y es dueño
                 de la salida por defecto. Entonces tapeamos su dispositivo virtual,
                 que a su vez está pasando audio, y los dos se traban.
-                Cerralo:  pkill -f eqMac.app
+                Ciérralo desde su ícono en la barra de menú, o en la Terminal:
+                killall eqMac
               · Falta permiso de captura de audio: Ajustes del Sistema → Privacidad
                 y seguridad → Grabación de audio.
 
