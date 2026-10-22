@@ -1,35 +1,100 @@
 name: release
 
 # Publica un .dmg descargable cuando se empuja una etiqueta de versión:
-#   git tag v0.2.1 && git push origin v0.2.1
+#   git tag v0.2.2 && git push origin v0.2.2
+#
+# Dos jobs con permisos distintos a propósito. El que compila no puede escribir
+# en el repo; el que publica no compila nada, solo sube lo que el primero dejó.
+# Cada .dmg sale con su SHA-256 y con una atestación de procedencia firmada por
+# GitHub, que ata el archivo a este workflow y a este commit. Eso no reemplaza
+# la notarización de Apple, pero deja verificar que el .dmg descargado salió de
+# este código y no de otro lado.
+#
+# Las Actions van fijadas por SHA completo, no por etiqueta: una etiqueta se
+# puede mover, un SHA no.
 on:
   push:
     tags: ['v*']
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
-  release:
+  build:
     runs-on: macos-15
+    permissions:
+      contents: read
+      id-token: write        # para firmar la atestación
+      attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: La etiqueta coincide con la versión del código
+        run: |
+          VERSION=$(sed -n 's/.*let version = "\(.*\)"/\1/p' Sources/BoosterKit/Booster.swift)
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "La etiqueta es $GITHUB_REF_NAME pero el código dice $VERSION" >&2
+            exit 1
+          fi
 
       - name: Compilar, testear y empaquetar
         run: |
           ./build-app.sh
           ./Tools/make-dmg.sh
 
+      - name: Checksums
+        run: cd dist && shasum -a 256 *.dmg | tee SHA256SUMS.txt
+
+      - name: Atestación de procedencia
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: dist/*.dmg
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: release
+          path: |
+            dist/*.dmg
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # crear la release
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: release
+          path: dist
+
       - name: Publicar
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.dmg \
+          gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
             --title "Subele $GITHUB_REF_NAME" \
             --notes-file - <<'NOTES'
           ## Instalación
 
           Descargá el `.dmg`, abrilo y arrastrá **Subele** a Aplicaciones.
+
+          ### Verificar que el .dmg es este código
+
+          El `.dmg` lo compila GitHub Actions desde la etiqueta, no una máquina
+          personal. Para comprobarlo:
+
+          ```
+          shasum -a 256 -c SHA256SUMS.txt
+          gh attestation verify subele-*.dmg --repo carlostapiacl/subele
+          ```
+
+          La segunda línea confirma que el archivo salió de este repositorio y de
+          este workflow.
 
           ### La primera vez macOS la va a bloquear
 
@@ -55,6 +120,10 @@ jobs:
           <summary>English</summary>
 
           Download the `.dmg`, open it and drag **Subele** to Applications.
+
+          The `.dmg` is built by GitHub Actions from the tag. Verify it with
+          `shasum -a 256 -c SHA256SUMS.txt` and
+          `gh attestation verify subele-*.dmg --repo carlostapiacl/subele`.
 
           The app is ad-hoc signed but **not notarised**, so macOS will block it the
           first time. Either go to **System Settings → Privacy & Security** and click

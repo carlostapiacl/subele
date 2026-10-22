@@ -5,17 +5,25 @@ on:
     branches: [main]
   pull_request:
 
+# Solo lectura: compilar y testear no necesita escribir nada.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      # Fijada por SHA completo, no por etiqueta: una etiqueta se puede mover.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
       - name: Swift version
         run: swift --version
       - name: Build
         run: swift build
-      # Los tests del DSP son procesamiento de señal puro — sin dispositivo de
-      # audio, sin tap, sin permisos — así que corren en una máquina de CI sin
-      # cabeza igual que en un laptop.
+      # Los tests no tocan hardware: el DSP es procesamiento de señal puro, y el
+      # motor corre sobre una HAL simulada (Tests/BoosterKitTests/FakeAudioHAL).
+      # Sin dispositivo de audio, sin tap y sin permisos, así que corren en una
+      # máquina de CI sin cabeza igual que en un laptop.
       - name: Test
         run: swift test

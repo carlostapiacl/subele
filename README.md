@@ -70,6 +70,23 @@ este proceso ──────────┴──── excluido del tap ─�
    (salida), así un solo callback del IOProc tiene las dos puntas.
 3. El callback procesa y escribe de vuelta.
 
+Dos detalles que no se ven en el diagrama:
+
+- **El agregado trae también las entradas del hardware.** Si la salida es una
+  interfaz USB o unos audífonos con micrófono, la entrada del callback es
+  "micrófono + tap", con el micrófono primero. El motor ubica qué buffers son del
+  tap (`IORenderer.tapBufferRange`) y lee solo esos: tomar el primero reproducía
+  el micrófono por los parlantes.
+- **Todo lo que se puede rechazar se rechaza antes de crear el tap.** El formato
+  de la salida (float32 nativo, hasta 32 canales) se valida primero; mientras no
+  hay tap el sistema suena como siempre. Si algo falla después, la cadena se
+  desarma entera y el tap se destruye, que es lo que devuelve el audio.
+
+`start` y `stop` corren en una cola propia (`EngineController`), nunca en la de
+la interfaz: CoreAudio puede bloquearse, y el menú tiene que seguir respondiendo
+para decirlo. Un watchdog revisa que el IOProc siga girando y, si se detiene,
+rehace la cadena: un tap que silencia a todos con un IOProc parado es un Mac mudo.
+
 La salida por defecto del sistema nunca cambia. El menú de volumen sigue diciendo
 "MacBook Pro (bocinas)", porque siguen siendo las bocinas del MacBook Pro.
 
@@ -96,12 +113,24 @@ constantes hasta que se viera bien.
 Hay un test para eso: una señal que salta de silencio a fondo de escala con 400%
 de ganancia aterriza en el techo, no lo atraviesa.
 
+**El techo es de true peak, no solo de muestras.** Entre dos muestras bajo el
+techo, la onda que reconstruye el conversor puede pasarlo: un seno a un cuarto de
+la frecuencia de muestreo con fase de 45° tiene todas sus muestras a −3 dBFS y
+llega a 0 dBFS de verdad. El paso 2 mira la muestra y tres puntos interpolados
+hasta la siguiente (sobremuestreo ×4, como ITU-R BS.1770) y calcula la ganancia
+contra el mayor. Es una estimación —un interpolador de 12 muestras, no uno
+ideal—, y el test de ese seno exige que la salida quede a 0,1 dB del techo.
+
+La ganancia del slider tampoco salta: persigue al valor nuevo en unos 10 ms, así
+pasar de 100% a 400% no hace clic.
+
 ## Modos
 
 - **Música** — solo ganancia y limitación. Dinámica intacta: lo que sonaba
-  fuerte respecto de lo que sonaba bajo sigue igual. **Con la ganancia en 100% no
-  hace nada, a propósito**: se nota al subir, cuando el limitador empieza a
-  trabajar. El panel lo dice debajo del selector, porque fue lo primero que
+  fuerte respecto de lo que sonaba bajo sigue igual. **Con la ganancia en 100%
+  casi no hace nada, a propósito**: solo toca los picos que ya vengan sobre el
+  techo de −0,3 dBFS, que en material bien masterizado son pocos o ninguno. Se
+  nota al subir, cuando el limitador empieza a trabajar. El panel lo dice debajo del selector, porque fue lo primero que
   preguntó alguien que la probó.
 - **Voz** — agrega compresión con makeup automático, que sube lo bajo en vez de
   aplastar lo alto. Para voz, llamadas y video con audio flojo. Este sí se nota
@@ -140,7 +169,8 @@ inestable.
 El menú **Frecuencia de muestreo** cambia la salida entre las frecuencias que
 acepte el dispositivo (44,1, 48, 96 kHz…), lo mismo que hacerlo en Configuración
 de Audio MIDI, pero sin saber que esa app existe. El cambio es para todo el
-sistema, y la cadena se rehace sola cuando el dispositivo lo termina de aplicar,
+sistema —las otras apps que usan ese dispositivo también pasan a esa
+frecuencia, y el menú lo dice—, y la cadena se rehace sola cuando el dispositivo lo termina de aplicar,
 también si se cambia desde afuera.
 
 Lo que gana y lo que no: subir de 44,1 a 96 kHz no le agrega detalle a una
@@ -219,7 +249,19 @@ correrlo en la máquina que lo compiló; distribuirlo pediría un certificado
 Developer ID y notarización.
 
 `Tools/make-dmg.sh` arma el `.dmg` descargable, y el workflow `release.yml` lo
-publica solo al empujar una etiqueta `v*`.
+publica solo al empujar una etiqueta `v*`: compila en GitHub, no en una máquina
+personal, publica el SHA-256 de cada `.dmg` y una atestación de procedencia que
+ata el archivo a este repositorio y a este workflow. Para verificar uno
+descargado:
+
+```bash
+shasum -a 256 -c SHA256SUMS.txt
+gh attestation verify subele-*.dmg --repo carlostapiacl/subele
+```
+
+No reemplaza la notarización de Apple, pero deja comprobar que el `.dmg` salió de
+este código. Las Actions del workflow van fijadas por SHA y cada job tiene solo
+los permisos que usa.
 
 El ícono se genera por código en `Tools/make-icon.swift`, así que se revisa en
 diff como cualquier otro archivo en vez de ser un binario opaco. Dibuja un dial
@@ -265,8 +307,10 @@ cuelgue así no deja ningún rastro.
 swift test
 ```
 
-Los tests del DSP son procesamiento de señal puro — sin dispositivo de audio, sin
-tap, sin permisos — así que corren en CI igual que en un laptop. Eso es
+Ningún test toca hardware: el DSP es procesamiento de señal puro, y el motor corre
+sobre una HAL simulada (`Tests/BoosterKitTests/FakeAudioHAL.swift`). Sin
+dispositivo de audio, sin tap, sin permisos, así que corren en CI igual que en
+un laptop. Eso es
 deliberado: medir por los parlantes no sirve, porque cualquier otra cosa que suene
 en la máquina se mezcla en el tap y contamina el medidor. Se perdieron dos rondas
 de mediciones por música de fondo antes de que los tests se fueran del hardware.
@@ -275,9 +319,21 @@ Lo que dejan clavado: ganancia exacta mientras haya headroom, el limitador
 llegando al techo pero nunca pasándolo, transitorios de silencio a fondo de
 escala, salida idéntica bit a bit entre bloques de 32 y de 1024, el ecualizador
 plano sin tocar un bit y cada banda subiendo lo que dice, conteos de canales
-de mono a 7.1 (1, 2, 4, 6 y 8), la curva dibujada coincidiendo con un seno filtrado
-de verdad, el analizador de espectro ubicando un tono, y NaN o infinito llegando a la entrada sin matar la
-cadena.
+de mono a 32, la curva dibujada coincidiendo con un seno filtrado
+de verdad, el analizador de espectro ubicando un tono, NaN o infinito llegando a la entrada sin matar la
+cadena, picos entre muestras limitados, y la ganancia cambiando en rampa.
+
+Y del motor, sobre la HAL simulada: una interfaz dúplex que nunca reproduce el
+micrófono, un buffer nulo que no silencia a los demás, callbacks más largos que
+el buffer de trabajo, formatos incompatibles (16 bits, float64, big-endian, más
+de 32 canales) rechazados antes de crear el tap, un agregado que tarda en estar
+listo, un `AudioDeviceStop` que falla sin dejar memoria liberada bajo un
+callback vivo, cien arranques y paradas sin perder recursos, y el watchdog
+rehaciendo la cadena cuando el IOProc se detiene —y rindiéndose si no sirve—.
+
+Lo que **no** cubren y queda para hardware real (por confirmar): interfaces USB
+dúplex concretas, desconectar un Bluetooth mientras suena, y el arranque sin
+permiso de captura.
 
 ## Limitaciones conocidas
 
@@ -302,30 +358,38 @@ Sources/BoosterKit/          la parte reutilizable, sin AppKit
   Atomics.swift              Float y UInt32 atómicos sobre CAtomics
   CoreAudio/
     AudioObject.swift        envoltorio tipado de la API de propiedades, errores, traza
-    AudioDevices.swift       consultas de dispositivos y observación de la salida
-    ProcessTap.swift         vida del tap
-    AggregateDevice.swift    vida del dispositivo agregado, tamaño de buffer
+    AudioDevices.swift       consultas de dispositivos, streams y observadores
+    AudioHAL.swift           lo que el motor le pide a CoreAudio, como protocolo
+    ProcessTap.swift         crear el tap y leer su formato
+    AggregateDevice.swift    crear el dispositivo agregado
   DSP/
     Decibels.swift           conversiones a dB y coeficientes de suavizado
     Compressor.swift         curva de rodilla suave y makeup automático
     Equalizer.swift          5 biquads RBJ, coeficientes recalculados en el hilo de audio
-    Limiter.swift            línea de retardo y mínimo deslizante
+    Limiter.swift            línea de retardo, mínimo deslizante y true peak
     BoostProcessor.swift     la cadena
   Analysis/
     SpectrumTap.swift        últimas muestras de la salida, sin locks
     SpectrumAnalyzer.swift   FFT a bandas logarítmicas
   Engine/
-    BoostEngine.swift        tap + agregado + IOProc + medición de latencia
+    BoostEngine.swift        arma y desarma tap + agregado + IOProc, en orden
+    EngineController.swift   cola propia, estados y watchdog
+    IORenderer.swift         el callback: ubica el tap, procesa, reparte
+    StreamFormat.swift       qué formatos se aceptan
 Sources/subele/              el ejecutable
   main.swift                 elige el modo según los argumentos
   EqualizerView.swift        el ecualizador gráfico
-  MenuBarApp.swift           frente en AppKit
+  MenuBarApp.swift           frente en AppKit: arma el menú y muestra el estado
+  StatusPanel.swift          el panel de arriba: medidor, slider, modo
+  StayOpenMenuRow.swift      fila de menú que no cierra el menú (presets)
+  EqualizerPreset.swift      los presets del ecualizador
+  AppSettings.swift          lo que se guarda entre sesiones
   MenuBarIcon.swift          ícono de la barra, dibujado por código
   LevelMeterView.swift
   ConsoleMode.swift
   Strings.swift              todo el texto visible, tipado, en dos idiomas
 Tools/make-icon.swift        genera AppIcon.icns
-Tests/BoosterKitTests/
+Tests/BoosterKitTests/       DSP, renderer, motor y controlador sobre FakeAudioHAL
 ```
 
 `BoosterKit` no depende de AppKit ni sabe que existe una interfaz, así que el
