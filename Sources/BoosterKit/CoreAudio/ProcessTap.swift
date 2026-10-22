@@ -15,13 +15,14 @@ import Foundation
 ///   el audio se escucha una vez —a través nuestro— y no dos.
 /// - Excluir nuestro propio proceso nos deja fuera de nuestro propio tap. Sin eso,
 ///   lo que escribimos al dispositivo se capturaría y volvería a entrar.
-public final class ProcessTap {
-
-    public let objectID: AudioObjectID
-    public let uuid: UUID
+///
+/// No es una clase con `deinit`: la destrucción la hace el motor de forma
+/// explícita, en orden y mirando el resultado (ver `BoostEngine.stop`).
+enum ProcessTap {
 
     /// Tapea todo lo que va a `deviceUID` menos los procesos indicados.
-    public init(excluding processes: [AudioObjectID], deviceUID: String, stream: Int = 0) throws {
+    static func create(excluding processes: [AudioObjectID], deviceUID: String,
+                       stream: Int = 0) throws -> (id: AudioObjectID, uuid: UUID) {
         let description = CATapDescription(
             __excludingProcesses: processes.map { NSNumber(value: $0) },
             andDeviceUID: deviceUID,
@@ -36,11 +37,15 @@ public final class ProcessTap {
         guard objectID != kAudioObjectUnknown else {
             throw AudioError("el process tap se creó vacío")
         }
-        self.objectID = objectID
-        self.uuid = description.uuid
+        return (objectID, description.uuid)
     }
 
-    deinit {
-        AudioHardwareDestroyProcessTap(objectID)
+    /// El formato en que el tap entrega el audio. Es el que hay que validar, no
+    /// el de la entrada del agregado: ese es el del primer stream de entrada, que
+    /// en una interfaz con micrófono es el micrófono.
+    static func format(of tap: AudioObjectID) throws -> AudioStreamBasicDescription {
+        try AudioObject.value(tap, kAudioTapPropertyFormat,
+                              initial: AudioStreamBasicDescription(),
+                              describing: "leer el formato del tap")
     }
 }
