@@ -9,14 +9,18 @@ import Foundation
 /// procesarlo, escribirlo de vuelta. El dispositivo es privado, así que nunca
 /// aparece en las preferencias de Sonido y la salida elegida por el usuario queda
 /// intacta.
-public final class AggregateDevice {
+///
+/// Ojo: el subdispositivo entra entero, con sus entradas si las tiene. La entrada
+/// del agregado es entonces "entradas físicas + tap", y el que separa una cosa de
+/// la otra es `IORenderer.tapBufferRange`.
+enum AggregateDevice {
 
-    public let objectID: AudioDeviceID
-
-    public init(tapUUID: UUID, outputDeviceUID: String, name: String = "Subele") throws {
+    static func create(tapUUID: UUID, outputDeviceUID: String,
+                       name: String = "Subele") throws -> AudioDeviceID {
         let description: [String: Any] = [
             kAudioAggregateDeviceNameKey: name,
             kAudioAggregateDeviceUIDKey: "cl.carlostapia.subele.\(UUID().uuidString)",
+            // El hardware real es el reloj: el tap se ajusta a él, no al revés.
             kAudioAggregateDeviceMainSubDeviceKey: outputDeviceUID,
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceIsStackedKey: false,
@@ -33,24 +37,6 @@ public final class AggregateDevice {
         var objectID = AudioDeviceID(kAudioObjectUnknown)
         try check(AudioHardwareCreateAggregateDevice(description as CFDictionary, &objectID),
                   "crear el dispositivo agregado")
-        self.objectID = objectID
-    }
-
-    /// Cuántos frames entrega el dispositivo por callback. Bajarlo recorta la
-    /// latencia y sube la frecuencia de despertadas; el dispositivo ajusta al
-    /// valor más cercano que soporte.
-    public var bufferFrameSize: UInt32 {
-        get {
-            AudioObject.optionalValue(objectID, kAudioDevicePropertyBufferFrameSize,
-                                      initial: UInt32(0)) ?? 0
-        }
-        set {
-            try? AudioObject.setValue(objectID, kAudioDevicePropertyBufferFrameSize,
-                                      to: newValue, describing: "fijar el tamaño de buffer")
-        }
-    }
-
-    deinit {
-        AudioHardwareDestroyAggregateDevice(objectID)
+        return objectID
     }
 }
