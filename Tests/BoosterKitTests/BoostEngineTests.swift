@@ -93,6 +93,9 @@ struct BoostEngineTests {
         let hal = FakeAudioHAL()
         hal.pollsUntilReady = 3
         let engine = makeEngine(hal)
+        // Tres sondeos de 20 ms no caben en 0,1 s en un runner de CI cargado:
+        // acá se prueba que espere, no cuánto tarda en rendirse.
+        engine.readinessTimeout = 5
         try engine.start()
         #expect(engine.isRunning)
         engine.stop()
